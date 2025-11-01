@@ -1,0 +1,13 @@
+:root {
+  --primary-color: rgb(0, 38, 255);
+  --secondary-color: rgb(42, 118, 225);
+}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
