@@ -4,10 +4,11 @@ function Signup() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const { signup, error, isLoading } = useSignup();
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await signup(username, email, password);
+    await signup(username, email, password, phoneNumber);
   };
   return (
     <div className="signup-page">
@@ -19,6 +20,13 @@ function Signup() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           className="username-input"
+        />
+        <label>Phone number: </label>
+        <input
+          type="text"
+          className="phone-number-input"
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value)}
         />
         <label>Email: </label>
         <input

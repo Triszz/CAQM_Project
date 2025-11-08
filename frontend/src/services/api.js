@@ -20,8 +20,8 @@ const getAuthHeaders = () => {
 };
 
 export const UserAPI = {
-  signup: (username, email, password) =>
-    api.post("/signup", { username, email, password }),
+  signup: (username, email, password, phoneNumber) =>
+    api.post("/signup", { username, email, password, phoneNumber }),
   login: (email, password) => api.post("/login", { email, password }),
   getUserInfo: () => api.get("/user-info", { headers: getAuthHeaders() }),
 };

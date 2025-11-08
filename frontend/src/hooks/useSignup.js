@@ -5,11 +5,16 @@ export const useSignup = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { dispatch } = useAuthContext();
-  const signup = async (username, email, password) => {
+  const signup = async (username, email, password, phoneNumber) => {
     setIsLoading(true);
     setError("");
     try {
-      const response = await UserAPI.signup(username, email, password);
+      const response = await UserAPI.signup(
+        username,
+        email,
+        password,
+        phoneNumber
+      );
       localStorage.setItem("user", JSON.stringify(response.data));
       dispatch({ type: "LOGIN", payload: response.data });
     } catch (error) {
