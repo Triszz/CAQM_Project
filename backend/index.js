@@ -12,17 +12,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// 🔴 THÊM DEBUG DÒ:
-console.log("✅ index.js loaded - middlewares configured");
-
 // routes
 app.use("/api", userRouter);
 app.use("/api/sensor", sensorRouter);
-
-// 🔴 THÊM DEBUG DÒ:
-console.log("✅ Routes registered:");
-console.log("   - /api (userRouter)");
-console.log("   - /api/sensor (sensorRouter)");
 
 // connect
 const PORT = process.env.PORT || 3000;

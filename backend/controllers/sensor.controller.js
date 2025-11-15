@@ -132,7 +132,5 @@ module.exports = {
   addSensorReading,
   getLatestSensorReading,
   getSensorReadingByRange,
-  getAllSensorReadings,
-  getSensorStats,
   deleteOldReadings,
 };
