@@ -102,6 +102,7 @@
 .button:hover {
   cursor: pointer;
   opacity: 0.8;
+  transition: ease 0.2s;
 }
 
 .button.signup-button,
@@ -129,6 +130,246 @@
   font-size: 20px;
 }
 
-.pages {
-  padding-top: 20px;
+.home-page-header {
+  border-bottom: 1px solid #ccc;
+  padding: 20px 50px;
+  box-shadow: 1px 4px #f5f5f5;
+}
+.home-page-header span {
+  display: block;
+  margin-top: 5px;
+  color: #888;
+}
+.dashboard-settings {
+  margin: 20px 50px;
+  padding: 5px;
+  background-color: #f2f5f9;
+  display: inline-block;
+  border-radius: 12px;
+}
+.dashboard-settings a {
+  text-decoration: none;
+  display: inline-block;
+  padding: 10px 50px;
+  color: black;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.dashboard-settings a.active {
+  background-color: white;
+}
+
+.quality-container {
+  margin: 20px 50px;
+  background-color: #d3f2ff;
+  border: 1px solid #6ed3ff;
+  border-radius: 12px;
+  padding: 20px 20px;
+}
+.quality-container.good-quality-container {
+  background-color: #f2faf2;
+  border: 1px solid #d5f1d7;
+}
+
+.quality-container.medium-quality-container {
+  background-color: #feffdc;
+  border: 1px solid #fbff82;
+}
+
+.quality-container.bad-quality-container {
+  background-color: #ffdddc;
+  border: 1px solid #fc807c;
+}
+
+.item-container {
+  display: inline-block;
+  padding: 20px;
+  margin: 20px 50px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.item-container .item-title {
+  font-weight: 600;
+  color: #67748b;
+}
+.item-container .value-unit-container {
+  margin: 20px 0;
+}
+.item-container .value-unit-container .item-value {
+  font-size: 32px;
+  font-weight: 700;
+}
+.item-container .value-unit-container .item-unit {
+  color: #67748b;
+  margin-left: 10px;
+}
+
+.item-container .item-quality {
+  display: inline-block;
+  padding: 10px;
+  background-color: #d3f2ff;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+}
+
+.item-container .item-quality.item-good-quality {
+  background-color: #54c35c;
+}
+
+.item-container .item-quality.item-medium-quality {
+  background-color: #f4db6b;
+}
+
+.item-container .item-quality.item-bad-quality {
+  background-color: #f46b6b;
+}
+
+.item-container .item-desc {
+  display: block;
+  margin: 20px 0;
+  font-size: 14px;
+  color: #67748b;
+}
+
+/* Chart css */
+
+.chart-container {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  width: 280px;
+}
+
+.chart-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.gauge-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.gauge-value {
+  position: absolute;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.value-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #1a73e8;
+  line-height: 1;
+}
+
+.value-unit {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 2px;
+}
+
+.chart-info {
+  margin-top: 10px;
+}
+
+.value-range {
+  font-size: 0.85rem;
+  color: #888;
+}
+.charts-grid {
+  display: flex;
+  justify-content: center;
+  margin: 20px 50px;
+}
+
+/* Setting page */
+.buzzer-setting-container,
+.led-setting-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 50px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.buzzer-setting-form,
+.led-setting-form {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.buzzer-input {
+  width: 200px;
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 8px;
+  background-color: #f8fafc;
+  border: 2px solid #f0f3f7;
+}
+
+.led-setting-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.buzzer-setting-buttons,
+.led-setting-buttons {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+}
+
+.buzzer-setting-title span,
+.led-setting-title span {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.9rem;
+  color: #888;
+}
+.buzzer-note,
+.led-note {
+  font-size: 0.85rem;
+  color: #888;
+}
+.test-buzzer,
+.save-buzzer,
+.save-led {
+  padding: 10px 15px;
+  font-size: 14px;
+}
+.button.test-buzzer {
+  background-color: #f8fafc;
+  border: 2px solid #f0f3f7;
+  color: #030817;
+}
+
+.button.test-buzzer:hover {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+.settings-page,
+.home-page {
+  background-color: #f8fafc;
+}
+
+.led-setting-info span {
+  color: var(--secondary-color);
+  font-weight: 600;
 }
