@@ -1,21 +1,21 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import ChatBot from "../components/ChatBot";
 
-function Settings() {
+function Settings({ chatMessages, setChatMessages }) {
   const [beep, setBeep] = useState(3);
   const [brightness, setBrightness] = useState(75);
+  const [showChatbot, setShowChatbot] = useState(false);
+
   return (
     <div className="settings-page">
-      <header className="home-page-header">
-        <h1>IAQM - Indoor Air Quality Monitor</h1>
-        <span>Giám sát và phân tích chất lượng không khí trong phòng</span>
-      </header>
       <div className="dashboard-settings">
-        <a href="/" style={{ color: "#68758c" }}>
+        <Link to="/" style={{ color: "#68758c" }}>
           Dashboard
-        </a>
-        <a href="/settings" className="active">
+        </Link>
+        <Link to="/settings" className="active">
           Settings
-        </a>
+        </Link>
       </div>
       <div className="buzzer-setting-container">
         <div className="buzzer-setting-title">
@@ -68,6 +68,22 @@ function Settings() {
           </div>
         </form>
       </div>
+      {!showChatbot && (
+        <button
+          className="chatbot-toggle-button"
+          onClick={() => setShowChatbot(true)}
+          title="Mở AI Assistant"
+        >
+          💬
+        </button>
+      )}
+      {showChatbot && (
+        <ChatBot
+          onClose={() => setShowChatbot(false)}
+          messages={chatMessages}
+          setMessages={setChatMessages}
+        />
+      )}
     </div>
   );
 }

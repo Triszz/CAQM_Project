@@ -9,7 +9,7 @@ function Header() {
   return (
     <div className="header">
       <div className="team-name" onClick={() => navigate("/")}>
-        3TL Team
+        IAQM - Indoor Air Quality Monitor
       </div>
       {user && (
         <div className="header-state">
