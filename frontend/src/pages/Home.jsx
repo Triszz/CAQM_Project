@@ -1,7 +1,8 @@
 import { useState } from "react";
-
+import { Link } from "react-router-dom";
 import Chart from "../components/Chart";
-function Home() {
+import ChatBot from "../components/ChatBot";
+function Home({ chatMessages, setChatMessages }) {
   const [quality, setQuality] = useState("TỐT");
   const [temperature, setTemperature] = useState(24.5);
   const [temperatureQuality, setTemperatureQuality] = useState("TỐT");
@@ -13,19 +14,17 @@ function Home() {
   const [coQuality, setCoQuality] = useState("TỐT");
   const [pm25, setPm25] = useState(18);
   const [pmQuality, setPmQuality] = useState("TỐT");
+  const [showChatbot, setShowChatbot] = useState(false);
+
   return (
     <div className="home-page">
-      <header className="home-page-header">
-        <h1>IAQM - Indoor Air Quality Monitor</h1>
-        <span>Giám sát và phân tích chất lượng không khí trong phòng</span>
-      </header>
       <div className="dashboard-settings">
-        <a href="/" className="active">
+        <Link to="/" className="active">
           Dashboard
-        </a>
-        <a href="/settings" style={{ color: "#68758c" }}>
+        </Link>
+        <Link to="/settings" style={{ color: "#68758c" }}>
           Settings
-        </a>
+        </Link>
       </div>
       {quality === "TỐT" ? (
         <div className="quality-container good-quality-container">
@@ -86,6 +85,22 @@ function Home() {
           unit="µg/m³"
         />
       </div>
+      {!showChatbot && (
+        <button
+          className="chatbot-toggle-button"
+          onClick={() => setShowChatbot(true)}
+          title="Mở AI Assistant"
+        >
+          💬
+        </button>
+      )}
+      {showChatbot && (
+        <ChatBot
+          onClose={() => setShowChatbot(false)}
+          messages={chatMessages}
+          setMessages={setChatMessages}
+        />
+      )}
     </div>
   );
 }
