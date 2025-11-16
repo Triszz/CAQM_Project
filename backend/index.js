@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const userRouter = require("./routes/user.route");
+const sensorRouter = require("./routes/sensor.route");
 require("dotenv").config();
 
 const app = express();
@@ -13,6 +14,7 @@ app.use(express.urlencoded({ extended: false }));
 
 // routes
 app.use("/api", userRouter);
+app.use("/api/sensor", sensorRouter);
 
 // connect
 const PORT = process.env.PORT || 3000;
