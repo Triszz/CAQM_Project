@@ -25,4 +25,12 @@ export const UserAPI = {
   login: (email, password) => api.post("/login", { email, password }),
   getUserInfo: () => api.get("/user-info", { headers: getAuthHeaders() }),
 };
+export const SensorAPI = {
+  getLatestSensorReading: () =>
+    api.get("/sensor/latest", { headers: getAuthHeaders() }),
+  getSensorReadingToday: () =>
+    api.get("/sensor/today", { headers: getAuthHeaders() }),
+  getSensorReadingLastHour: () =>
+    api.get("/sensor/last-hour", { headers: getAuthHeaders() }),
+};
 export default api;

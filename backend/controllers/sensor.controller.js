@@ -1,4 +1,5 @@
 const Sensor = require("../models/sensor.model");
+const moment = require("moment-timezone");
 
 const addSensorReading = async (req, res) => {
   try {
@@ -15,7 +16,9 @@ const addSensorReading = async (req, res) => {
       co === undefined ||
       pm25 === undefined
     ) {
-      return res.status(400).json({ error: "All sensor fields must be filled!" });
+      return res
+        .status(400)
+        .json({ error: "All sensor fields must be filled!" });
     }
     // Tạo bản ghi mới trong MongoDB
     // Mongoose schema sẽ validate:
@@ -41,7 +44,9 @@ const addSensorReading = async (req, res) => {
 
 const getLatestSensorReading = async (req, res) => {
   try {
-    const latestReading = await Sensor.findOne().sort({ timestamp: -1 }).limit(1);
+    const latestReading = await Sensor.findOne()
+      .sort({ timestamp: -1 })
+      .limit(1);
 
     // Kiểm tra có dữ liệu không
     if (!latestReading) {
@@ -55,6 +60,24 @@ const getLatestSensorReading = async (req, res) => {
   }
 };
 
+const getSensorReadingToday = async (req, res) => {
+  try {
+    const startOfDay = moment.tz("Asia/Ho_Chi_Minh").startOf("day").toDate();
+    const now = moment.tz("Asia/Ho_Chi_Minh").endOf("day").toDate();
+
+    const readings = await Sensor.find({
+      timestamp: { $gte: startOfDay, $lte: now },
+    }).sort({ timestamp: 1 });
+
+    res.status(200).json({
+      count: readings.length,
+      data: readings,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const getSensorReadingByRange = async (req, res) => {
   try {
     // Rút từ query string: /api/sensor/range?from=...&to=...
@@ -62,7 +85,9 @@ const getSensorReadingByRange = async (req, res) => {
 
     // Validate: từ và đến phải có cả 2
     if (!from || !to) {
-      return res.status(400).json({ error: "From and to timestamps must be provided!" });
+      return res
+        .status(400)
+        .json({ error: "From and to timestamps must be provided!" });
     }
 
     // Chuyển string milliseconds thành Date objects
@@ -80,7 +105,9 @@ const getSensorReadingByRange = async (req, res) => {
 
     // Kiểm tra có dữ liệu không
     if (readings.length === 0) {
-      return res.status(404).json({ error: "No sensor readings found in this range!" });
+      return res
+        .status(404)
+        .json({ error: "No sensor readings found in this range!" });
     }
 
     // Trả mảng documents
@@ -96,7 +123,9 @@ const deleteOldReadings = async (req, res) => {
 
     // Validate: days phải có giá trị
     if (!days) {
-      return res.status(400).json({ error: "Days parameter must be provided!" });
+      return res
+        .status(400)
+        .json({ error: "Days parameter must be provided!" });
     }
 
     // Tính ngày cutoff
@@ -122,7 +151,42 @@ const deleteOldReadings = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+const getSensorReadingLastHour = async (req, res) => {
+  try {
+    // Lấy thời điểm hiện tại và 1 giờ trước (theo giờ VN)
+    const now = moment.tz("Asia/Ho_Chi_Minh");
+    const oneHourAgo = moment.tz("Asia/Ho_Chi_Minh").subtract(1, "hour");
 
+    // Chuyển sang UTC để query MongoDB
+    const nowUTC = now.utc().toDate();
+    const oneHourAgoUTC = oneHourAgo.utc().toDate();
+
+    console.log(`Querying from ${oneHourAgo.format()} to ${now.format()}`);
+
+    // Query database
+    const readings = await Sensor.find({
+      timestamp: { $gte: oneHourAgoUTC, $lte: nowUTC },
+    }).sort({ timestamp: 1 }); // Sắp xếp tăng dần
+
+    console.log(`Found ${readings.length} readings in last hour`);
+
+    res.status(200).json({
+      success: true,
+      count: readings.length,
+      data: readings,
+      timeRange: {
+        from: oneHourAgoUTC.toISOString(),
+        to: nowUTC.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Error in getSensorReadingLastHour:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
 /**
  * ============ EXPORT TẤT CẢ HÀM ============
  * QUAN TRỌNG: Nếu không export, route sẽ không tìm thấy function
@@ -132,5 +196,7 @@ module.exports = {
   addSensorReading,
   getLatestSensorReading,
   getSensorReadingByRange,
+  getSensorReadingToday,
   deleteOldReadings,
+  getSensorReadingLastHour,
 };

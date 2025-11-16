@@ -1,6 +1,6 @@
 import { PieChart, Pie, Cell } from "recharts";
 
-function Chart({
+function Gauge({
   id,
   title,
   value,
@@ -63,4 +63,4 @@ function Chart({
   );
 }
 
-export default Chart;
+export default Gauge;
