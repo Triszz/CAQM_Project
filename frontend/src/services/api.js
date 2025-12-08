@@ -33,4 +33,35 @@ export const SensorAPI = {
   getSensorReadingLastHour: () =>
     api.get("/sensor/last-hour", { headers: getAuthHeaders() }),
 };
+
+export const DeviceStateAPI = {
+  // ✅ Lấy tất cả device states
+  getAllDeviceStates: () =>
+    api.get("/device-state", { headers: getAuthHeaders() }),
+
+  // ✅ Lấy state của 1 device
+  getDeviceState: (deviceType) =>
+    api.get(`/device-state/${deviceType}`, { headers: getAuthHeaders() }),
+
+  // ✅ Cập nhật LED brightness
+  updateLedBrightness: (data) =>
+    api.put("/device-state/led/brightness", data, {
+      headers: getAuthHeaders(),
+    }),
+
+  // ✅ Cập nhật Buzzer config
+  updateBuzzerConfig: (data) =>
+    api.put("/device-state/buzzer/config", data, { headers: getAuthHeaders() }),
+
+  // ✅ Test buzzer
+  testBuzzer: (config) =>
+    api.post("/device-state/buzzer/test", config, {
+      headers: getAuthHeaders(),
+    }),
+};
+
+export const AirQualityAPI = {
+  getCurrentAirQuality: () =>
+    api.get("/air-quality/current", { headers: getAuthHeaders() }),
+};
 export default api;

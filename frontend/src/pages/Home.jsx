@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Gauge from "../components/Gauge";
 import ChatBot from "../components/ChatBot";
-import { SensorAPI } from "../services/api";
+import { SensorAPI, AirQualityAPI } from "../services/api";
 import { useAuthContext } from "../hooks/useAuthContext";
 import RealTimeChart from "../components/RealTimeChart";
 function Home({ chatMessages, setChatMessages }) {
   const { user } = useAuthContext();
-  const [quality, setQuality] = useState("TỐT");
+  const [quality, setQuality] = useState("Tốt");
   const [temperature, setTemperature] = useState(24.5);
   const [humidity, setHumidity] = useState(62);
   const [co2, setCo2] = useState(850);
@@ -17,6 +17,33 @@ function Home({ chatMessages, setChatMessages }) {
 
   const [realtimeData, setRealtimeData] = useState([]);
   const maxRealtimePoints = 1200;
+  // ✅ useEffect 0: Load và update Air Quality mỗi 3 giây
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const loadAirQuality = async () => {
+      try {
+        console.log("🤖 Loading air quality...");
+        const response = await AirQualityAPI.getCurrentAirQuality();
+        const airQuality = response.data.data.quality;
+
+        setQuality(airQuality);
+        console.log(`✅ Air Quality: ${airQuality}`);
+      } catch (error) {
+        console.error("❌ Failed to load air quality:", error);
+        // Nếu chưa có dữ liệu, giữ giá trị mặc định
+        if (error.response?.status === 404) {
+          setQuality("Tốt"); // Default
+        }
+      }
+    };
+
+    loadAirQuality();
+
+    const airQualityInterval = setInterval(loadAirQuality, 3000);
+
+    return () => clearInterval(airQualityInterval);
+  }, [user?.token]); // ✅ CHỈ phụ thuộc vào user.token
 
   // ✅ useEffect 1: Load dữ liệu 1 giờ ban đầu
   useEffect(() => {
@@ -146,6 +173,61 @@ function Home({ chatMessages, setChatMessages }) {
 
     return () => clearTimeout(timeoutId);
   }, [user?.token, maxRealtimePoints]);
+
+  // // ✅ useEffect 2: Cập nhật CẢ GAUGE VÀ CHART mỗi 3 giây
+  // useEffect(() => {
+  //   if (!user?.token) return;
+
+  //   const updateSensorData = async () => {
+  //     try {
+  //       const response = await SensorAPI.getLatestSensorReading();
+  //       const data = response.data;
+
+  //       // ✅ Update gauges
+  //       setTemperature(data.temperature);
+  //       setHumidity(data.humidity);
+  //       setCo2(data.co2);
+  //       setCo(data.co);
+  //       setPm25(data.pm25);
+
+  //       // ✅ Update chart
+  //       const newPoint = {
+  //         time: new Date().toLocaleTimeString("vi-VN", {
+  //           hour: "2-digit",
+  //           minute: "2-digit",
+  //           second: "2-digit",
+  //         }),
+  //         co2: data.co2,
+  //         temperature: data.temperature,
+  //         humidity: data.humidity,
+  //         pm25: data.pm25,
+  //         co: data.co,
+  //       };
+
+  //       setRealtimeData((prev) => {
+  //         const updated = [...prev, newPoint];
+  //         if (updated.length > maxRealtimePoints) {
+  //           return updated.slice(-maxRealtimePoints);
+  //         }
+  //         return updated;
+  //       });
+
+  //       console.log(
+  //         `📊 [${new Date().toLocaleTimeString()}] Gauges & Chart updated`
+  //       );
+  //     } catch (error) {
+  //       console.error("Failed to fetch sensor data:", error);
+  //     }
+  //   };
+
+  //   // Chạy ngay lần đầu
+  //   updateSensorData();
+
+  //   // ✅ Interval 3 giây cho CẢ gauges VÀ chart
+  //   const sensorInterval = setInterval(updateSensorData, 3000);
+
+  //   return () => clearInterval(sensorInterval);
+  // }, [user?.token, maxRealtimePoints]);
 
   return (
     <div className="home-page">

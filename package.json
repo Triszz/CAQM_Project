@@ -10,7 +10,8 @@
     "install:all": "npm run install:backend && npm run install:frontend"
   },
   "dependencies": {
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "mqtt": "^5.14.1"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
