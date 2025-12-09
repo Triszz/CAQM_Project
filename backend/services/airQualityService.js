@@ -11,42 +11,51 @@ mqttClient.on("connect", () => {
   console.log("✅ MQTT connected (airQualityService)");
 });
 
-// ✅ Hàm gọi AI (tạm thời dùng logic đơn giản)
+// ✅ Hàm gọi AI (Decision Tree từ Python)
 async function predictAirQuality(sensorData) {
   try {
     const { co2, co, pm25, temperature, humidity } = sensorData;
 
-    // TODO: Thay bằng AI prediction thật từ bạn của bạn
-    // Có thể gọi API Python Flask/FastAPI hoặc load model TensorFlow.js
-
-    let quality;
-    let confidence;
-
-    // Logic tạm thời (THAY BẰNG AI)
-    if (co2 > 1000 || co > 9 || pm25 > 35) {
-      quality = "Kém";
-      confidence = 0.9;
-    } else if (co2 > 800 || co > 5 || pm25 > 25) {
-      quality = "Trung bình";
-      confidence = 0.85;
-    } else {
-      quality = "Tốt";
-      confidence = 0.95;
+    // Validate input
+    if (
+      co2 === undefined ||
+      co === undefined ||
+      pm25 === undefined ||
+      temperature === undefined ||
+      humidity === undefined
+    ) {
+      throw new Error("Missing required sensor fields");
     }
 
-    /* 
-    // ✅ KHI TÍCH HỢP AI THẬT (Python API):
-    const response = await fetch('http://localhost:5000/predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sensorData)
-    });
-    const result = await response.json();
-    quality = result.quality;
-    confidence = result.confidence;
-    */
+    // 🔗 Gọi Python Decision Tree API
+    const response = await fetch(
+      process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          co2,
+          co,
+          pm25,
+          temperature,
+          humidity,
+        }),
+      }
+    );
 
-    return { quality, confidence };
+    if (!response.ok) {
+      throw new Error(
+        `AI Service error: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const result = await response.json();
+
+    return {
+      quality: result.quality,
+      confidence: result.confidence,
+      problematicSensors: result.problematic_sensors || [],
+    };
   } catch (error) {
     console.error("❌ AI prediction error:", error);
     throw error;
@@ -67,9 +76,16 @@ function getColorForQuality(quality) {
 async function processSensorData(sensorData) {
   try {
     // 1. Gọi AI prediction
-    const { quality, confidence } = await predictAirQuality(sensorData);
+    const { quality, confidence, problematicSensors } =
+      await predictAirQuality(sensorData);
 
-    console.log(`🤖 AI: ${quality} (confidence: ${confidence})`);
+    console.log(
+      `🤖 AI: ${quality} (confidence: ${confidence}) - Problematic sensors: ${
+        problematicSensors.length > 0
+          ? problematicSensors.map((s) => s.sensor).join(", ")
+          : "None"
+      }`
+    );
 
     // 2. Xác định màu LED
     const ledColor = getColorForQuality(quality);
@@ -115,6 +131,7 @@ async function processSensorData(sensorData) {
           action: "alert",
           reason: "poor_air_quality",
           quality: quality,
+          problematicSensors: problematicSensors,
           config: {
             beepCount,
             beepDuration,
@@ -134,7 +151,11 @@ async function processSensorData(sensorData) {
         buzzerTriggered = true;
         buzzerConfig = { beepCount, beepDuration, interval };
 
-        console.log(`🚨 Buzzer triggered: ${beepCount} beeps`);
+        console.log(
+          `🚨 Buzzer triggered: ${beepCount} beeps (Problematic sensors: ${problematicSensors
+            .map((s) => s.sensor)
+            .join(", ")})`
+        );
 
         // Cập nhật lastTriggered
         await DeviceState.findOneAndUpdate(
@@ -152,10 +173,17 @@ async function processSensorData(sensorData) {
       ledColor,
       buzzerTriggered,
       buzzerConfig,
+      problematicSensors,
       timestamp: new Date(),
     });
 
-    return { quality, confidence, ledColor, buzzerTriggered };
+    return {
+      quality,
+      confidence,
+      ledColor,
+      buzzerTriggered,
+      problematicSensors,
+    };
   } catch (error) {
     console.error("❌ Error processing sensor data:", error);
     throw error;
