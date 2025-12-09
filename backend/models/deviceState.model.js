@@ -6,7 +6,7 @@ const DeviceStateSchema = new mongoose.Schema(
     deviceType: {
       type: String,
       required: true,
-      enum: ["led", "buzzer", "fan"],
+      enum: ["led", "buzzer"],
       unique: true, // Mỗi loại device chỉ có 1 document (trạng thái hiện tại)
     },
 

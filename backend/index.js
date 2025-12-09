@@ -1,11 +1,12 @@
 const express = require("express");
 const cors = require("cors");
+require("dotenv").config();
 const mongoose = require("mongoose");
 const userRouter = require("./routes/user.route");
 const sensorRouter = require("./routes/sensor.route");
 const deviceStateRouter = require("./routes/deviceState.route");
 const airQualityRouter = require("./routes/airQuality.route");
-require("dotenv").config();
+const emailRoutes = require("./routes/email.route");
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use("/api", userRouter);
 app.use("/api/sensor", sensorRouter);
 app.use("/api/device-state", deviceStateRouter);
 app.use("/api/air-quality", airQualityRouter);
+app.use("/api/email", emailRoutes);
 
 // ✅ Khởi động MQTT subscriber
 const mqttSubscriber = require("./mqtt/subscriber");
