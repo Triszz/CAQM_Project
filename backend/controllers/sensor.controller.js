@@ -48,15 +48,23 @@ const getLatestSensorReading = async (req, res) => {
       .sort({ timestamp: -1 })
       .limit(1);
 
-    // Kiểm tra có dữ liệu không
     if (!latestReading) {
-      return res.status(404).json({ error: "No sensor readings found!" });
+      return res.status(404).json({
+        success: false,
+        error: "No sensor readings found!",
+      });
     }
 
-    // Trả document mới nhất
-    res.status(200).json(latestReading);
+    // ✅ SỬA: Wrap trong { success: true, data: ... }
+    res.status(200).json({
+      success: true,
+      data: latestReading,
+    });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
   }
 };
 

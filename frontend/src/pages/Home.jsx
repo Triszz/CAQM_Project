@@ -98,7 +98,7 @@ function Home({ chatMessages, setChatMessages }) {
     const updateGauges = async () => {
       try {
         const response = await SensorAPI.getLatestSensorReading();
-        const data = response.data;
+        const data = response.data.data;
 
         // ✅ Chỉ update gauges (không update chart)
         setTemperature(data.temperature);
@@ -129,7 +129,7 @@ function Home({ chatMessages, setChatMessages }) {
     const updateLineChart = async () => {
       try {
         const response = await SensorAPI.getLatestSensorReading();
-        const data = response.data;
+        const data = response.data.data;
 
         // ✅ Chỉ update line chart
         const newPoint = {
