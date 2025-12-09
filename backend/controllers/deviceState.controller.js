@@ -1,18 +1,7 @@
 const DeviceState = require("../models/deviceState.model");
 const mqtt = require("mqtt");
 const MQTT_TOPICS = require("../config/mqtt.config");
-
-const mqttClient = mqtt.connect(
-  process.env.MQTT_BROKER_URL || "mqtt://broker.hivemq.com"
-);
-
-mqttClient.on("connect", () => {
-  console.log("✅ MQTT client connected");
-});
-
-mqttClient.on("error", (err) => {
-  console.error("❌ MQTT connection error:", err);
-});
+const { getMqttClient } = require("../config/mqtt.client");
 
 // ✅ Cập nhật độ sáng LED (GIỮ MÀU HIỆN TẠI)
 const updateLedBrightness = async (req, res) => {
@@ -52,7 +41,7 @@ const updateLedBrightness = async (req, res) => {
       color: currentColor, // Giữ nguyên màu hiện tại
       timestamp: new Date().toISOString(),
     };
-
+    const mqttClient = getMqttClient();
     mqttClient.publish(
       MQTT_TOPICS.DEVICE_CONTROL,
       JSON.stringify(mqttPayload),
@@ -148,7 +137,7 @@ const testBuzzer = async (req, res) => {
 
     console.log("📤 MQTT Payload (Test Buzzer):");
     console.log(JSON.stringify(mqttPayload, null, 2));
-
+    const mqttClient = getMqttClient();
     mqttClient.publish(
       MQTT_TOPICS.DEVICE_CONTROL,
       JSON.stringify(mqttPayload),

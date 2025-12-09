@@ -1,6 +1,12 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+// ✅ THÊM: Import và khởi tạo MQTT client
+const { initMqttClient } = require("./config/mqtt.client");
+
+// ✅ THÊM: Khởi tạo MQTT client NGAY ĐẦU
+initMqttClient();
+
 const mongoose = require("mongoose");
 const userRouter = require("./routes/user.route");
 const sensorRouter = require("./routes/sensor.route");
