@@ -195,6 +195,70 @@ const getSensorReadingLastHour = async (req, res) => {
     });
   }
 };
+// ✅ THÊM: Lấy giá trị trung bình tất cả cảm biến
+const getSensorAverages = async (req, res) => {
+  try {
+    console.log("📊 Calculating sensor averages...");
+
+    // ✅ CÁCH 1: Dùng MongoDB Aggregation (HIỆU QUẢ)
+    const averages = await Sensor.aggregate([
+      {
+        $group: {
+          _id: null, // Nhóm tất cả documents
+          avgTemperature: { $avg: "$temperature" },
+          avgHumidity: { $avg: "$humidity" },
+          avgCO2: { $avg: "$co2" },
+          avgCO: { $avg: "$co" },
+          avgPM25: { $avg: "$pm25" },
+          totalRecords: { $sum: 1 }, // Đếm số lượng records
+        },
+      },
+    ]);
+
+    // ✅ Kiểm tra có data không
+    if (!averages || averages.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No sensor data found",
+        data: {
+          temperature: 0,
+          humidity: 0,
+          co2: 0,
+          co: 0,
+          pm25: 0,
+          totalRecords: 0,
+        },
+      });
+    }
+
+    const result = averages[0];
+
+    // ✅ Format kết quả (làm tròn 2 chữ số thập phân)
+    const formattedResult = {
+      temperature: parseFloat(result.avgTemperature?.toFixed(2) || 0),
+      humidity: parseFloat(result.avgHumidity?.toFixed(2) || 0),
+      co2: Math.round(result.avgCO2 || 0),
+      co: parseFloat(result.avgCO?.toFixed(2) || 0),
+      pm25: parseFloat(result.avgPM25?.toFixed(2) || 0),
+      totalRecords: result.totalRecords || 0,
+    };
+
+    console.log("✅ Sensor averages calculated:", formattedResult);
+
+    res.status(200).json({
+      success: true,
+      message: "Sensor averages retrieved successfully",
+      data: formattedResult,
+    });
+  } catch (error) {
+    console.error("❌ Error calculating sensor averages:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to calculate sensor averages",
+      error: error.message,
+    });
+  }
+};
 /**
  * ============ EXPORT TẤT CẢ HÀM ============
  * QUAN TRỌNG: Nếu không export, route sẽ không tìm thấy function
@@ -207,4 +271,5 @@ module.exports = {
   getSensorReadingToday,
   deleteOldReadings,
   getSensorReadingLastHour,
+  getSensorAverages,
 };

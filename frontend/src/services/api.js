@@ -64,4 +64,19 @@ export const AirQualityAPI = {
   getCurrentAirQuality: () =>
     api.get("/air-quality/current", { headers: getAuthHeaders() }),
 };
+
+export const ChatbotAPI = {
+  // ✅ Gửi message đến chatbot
+  sendMessage: (message, userId) =>
+    api.post(
+      "/chatbot/message",
+      { message, userId },
+      { headers: getAuthHeaders() }
+    ),
+
+  // ✅ Xóa conversation history
+  clearHistory: (userId) =>
+    api.post("/chatbot/clear", { userId }, { headers: getAuthHeaders() }),
+};
+
 export default api;
