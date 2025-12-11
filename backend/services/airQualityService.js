@@ -5,14 +5,8 @@ const DeviceState = require("../models/deviceState.model");
 const mqtt = require("mqtt");
 const MQTT_TOPICS = require("../config/mqtt.config");
 const { sendAirQualityAlert } = require("./emailService"); // ✅ ĐÃ CÓ
-
-const mqttClient = mqtt.connect(
-  process.env.MQTT_BROKER_URL || "mqtt://broker.hivemq.com"
-);
-
-mqttClient.on("connect", () => {
-  console.log("✅ MQTT connected (airQualityService)");
-});
+const { getMqttClient, isMqttConnected } = require("../config/mqtt.client");
+const { sendPushsaferAlert } = require("./pushsafer.service");
 
 // ✅ THÊM: Biến lưu trạng thái email (tránh spam)
 let lastEmailSent = 0;
@@ -34,35 +28,52 @@ async function predictAirQuality(sensorData) {
       throw new Error("Missing required sensor fields");
     }
 
-    // 🔗 Gọi Python Decision Tree API
-    const response = await fetch(
-      process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          co2,
-          co,
-          pm25,
-          temperature,
-          humidity,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `AI Service error: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const result = await response.json();
-
+    // ✅ TEST MODE: Force "Kém" để test buzzer + LED + email
+    console.log("🧪 TEST MODE: Forcing quality to 'Kém'");
     return {
-      quality: result.quality,
-      confidence: result.confidence,
-      problematicSensors: result.problematic_sensors || [],
+      quality: "Kém",
+      confidence: 0.95,
+      problematicSensors: [
+        {
+          sensor: "CO2",
+          value: co2,
+          unit: "ppm",
+          threshold: 1000,
+          severity: "cao",
+        },
+        {
+          sensor: "PM2.5",
+          value: pm25,
+          unit: "μg/m³",
+          threshold: 35,
+          severity: "cao",
+        },
+      ],
     };
+    // 🔗 Gọi Python Decision Tree API
+    // const response = await fetch(process.env.AI_SERVICE_URL || "http://localhost:5000/predict", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({
+    //     co2,
+    //     co,
+    //     pm25,
+    //     temperature,
+    //     humidity,
+    //   }),
+    // });
+
+    // if (!response.ok) {
+    //   throw new Error(`AI Service error: ${response.status} ${response.statusText}`);
+    // }
+
+    // const result = await response.json();
+
+    // return {
+    //   quality: result.quality,
+    //   confidence: result.confidence,
+    //   problematicSensors: result.problematic_sensors || [],
+    // };
   } catch (error) {
     console.error("❌ AI prediction error:", error);
     throw error;
@@ -80,27 +91,26 @@ function getColorForQuality(quality) {
 }
 
 // ✅ Xử lý sensor data: AI + LED + Buzzer + EMAIL
+// services/airQualityService.js
+
 async function processSensorData(sensorData) {
   try {
-    // 1. Gọi AI prediction
-    const { quality, confidence, problematicSensors } = await predictAirQuality(
-      sensorData
-    );
+    const mqttClient = getMqttClient();
+
+    // 1. AI prediction
+    const { quality, confidence, problematicSensors } = await predictAirQuality(sensorData);
 
     console.log(
       `🤖 AI: ${quality} (confidence: ${confidence}) - Problematic sensors: ${
-        problematicSensors.length > 0
-          ? problematicSensors.map((s) => s.sensor).join(", ")
-          : "None"
+        problematicSensors.length > 0 ? problematicSensors.map((s) => s.sensor).join(", ") : "None"
       }`
     );
 
-    // 2. Xác định màu LED
+    // 2. LED đổi màu
     const ledColor = getColorForQuality(quality);
     const ledState = await DeviceState.findOne({ deviceType: "led" });
     const currentBrightness = ledState?.ledState?.brightness || 75;
 
-    // 3. Gửi lệnh LED đổi màu
     const ledPayload = {
       device: "led",
       action: "set_color",
@@ -126,67 +136,106 @@ async function processSensorData(sensorData) {
       { upsert: true }
     );
 
-    // 4. Nếu "Kém" → Trigger buzzer + GỬI EMAIL
+    // 3. Buzzer + Email
     let buzzerTriggered = false;
     let buzzerConfig = null;
     let emailSent = false;
 
     if (quality === "Kém") {
-      const buzzerState = await DeviceState.findOne({ deviceType: "buzzer" });
+      console.log("\n========== POOR AIR QUALITY DETECTED ==========");
+      console.log("🔍 MQTT connected?", isMqttConnected());
 
-      // ✅ 4.1. Trigger Buzzer
-      if (buzzerState) {
-        const { beepCount, beepDuration, interval } = buzzerState.buzzerState;
+      if (!isMqttConnected()) {
+        console.error("❌ MQTT not connected! Cannot send buzzer alert.");
+        console.log("   Skipping buzzer trigger...");
+      } else {
+        console.log("✅ MQTT is connected");
 
-        const buzzerPayload = {
-          device: "buzzer",
-          action: "alert",
-          reason: "poor_air_quality",
-          quality: quality,
-          problematicSensors: problematicSensors,
-          config: {
+        const buzzerState = await DeviceState.findOne({ deviceType: "buzzer" });
+
+        console.log("🔍 Buzzer state:", buzzerState);
+
+        if (buzzerState) {
+          const { beepCount, beepDuration, interval } = buzzerState.buzzerState;
+
+          console.log("🔍 Buzzer config:", {
             beepCount,
             beepDuration,
             interval,
-          },
-          timestamp: new Date().toISOString(),
-        };
+          });
 
-        mqttClient.publish(
-          MQTT_TOPICS.DEVICE_CONTROL,
-          JSON.stringify(buzzerPayload),
-          {
-            qos: 1,
-          }
-        );
+          const buzzerPayload = {
+            device: "buzzer",
+            action: "alert",
+            reason: "poor_air_quality",
+            quality: quality,
+            problematicSensors: problematicSensors,
+            config: {
+              beepCount: parseInt(beepCount),
+              beepDuration: parseInt(beepDuration),
+              interval: parseInt(interval),
+            },
+            timestamp: new Date().toISOString(),
+          };
 
-        buzzerTriggered = true;
-        buzzerConfig = { beepCount, beepDuration, interval };
+          console.log("📤 Publishing buzzer alert to MQTT...");
+          console.log("   Topic:", MQTT_TOPICS.DEVICE_CONTROL);
+          console.log("   Payload:", JSON.stringify(buzzerPayload, null, 2));
 
-        console.log(
-          `🚨 Buzzer triggered: ${beepCount} beeps (Problematic sensors: ${problematicSensors
-            .map((s) => s.sensor)
-            .join(", ")})`
-        );
+          await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Cập nhật lastTriggered
-        await DeviceState.findOneAndUpdate(
-          { deviceType: "buzzer" },
-          { $set: { "buzzerState.lastTriggered": new Date() } }
-        );
+          mqttClient.publish(MQTT_TOPICS.DEVICE_CONTROL, JSON.stringify(buzzerPayload), { qos: 1 }, (err) => {
+            if (err) {
+              console.error("❌ MQTT publish error:", err);
+            } else {
+              console.log("✅ Buzzer alert published successfully!");
+            }
+          });
+
+          buzzerTriggered = true;
+          buzzerConfig = { beepCount, beepDuration, interval };
+
+          // ✅ DI CHUYỂN LOG VÀO ĐÂY
+          console.log(`🚨 Buzzer alert SENT: ${beepCount} beeps`);
+
+          await DeviceState.findOneAndUpdate(
+            { deviceType: "buzzer" },
+            { $set: { "buzzerState.lastTriggered": new Date() } }
+          );
+        } else {
+          console.error("❌ Buzzer state not found in DB!");
+          console.log("   Creating default buzzer state...");
+
+          // ✅ THÊM: Tạo default buzzer state nếu chưa có
+          await DeviceState.create({
+            deviceType: "buzzer",
+            buzzerState: {
+              beepCount: 5,
+              beepDuration: 300,
+              interval: 200,
+              lastTriggered: null,
+            },
+            isActive: true,
+            lastUpdated: new Date(),
+          });
+
+          console.log("✅ Default buzzer state created. Retry on next cycle.");
+        }
       }
 
-      // ✅ 4.2. GỬI EMAIL CẢNH BÁO (với cooldown)
+      console.log("===============================================\n");
+
+      // 4. Email + Pushsafer
       const now = Date.now();
 
       if (now - lastEmailSent >= EMAIL_COOLDOWN) {
-        console.log("📧 Sending air quality alert email...");
+        console.log("📧 Sending air quality alert email & Pushsafer...");
 
         try {
-          // TODO: Lấy email user từ database (hiện tại dùng env)
           const userEmail = process.env.ALERT_EMAIL || process.env.EMAIL_USER;
-          const username = "User"; // TODO: Lấy từ user collection
+          const username = "User";
 
+          // 4.1 Gửi email
           const emailResult = await sendAirQualityAlert(userEmail, username, {
             temperature: sensorData.temperature,
             humidity: sensorData.humidity,
@@ -195,6 +244,13 @@ async function processSensorData(sensorData) {
             pm25: sensorData.pm25,
             quality: quality,
           });
+
+          // 4.2 Gửi push qua Pushsafer (không làm hỏng flow nếu lỗi)
+          try {
+            await sendPushsaferAlert(sensorData, quality);
+          } catch (psError) {
+            console.error("❌ Pushsafer sending error:", psError);
+          }
 
           if (emailResult.success) {
             lastEmailSent = now;
@@ -207,12 +263,8 @@ async function processSensorData(sensorData) {
           console.error("❌ Email sending error:", emailError);
         }
       } else {
-        const timeLeft = Math.ceil(
-          (EMAIL_COOLDOWN - (now - lastEmailSent)) / 1000
-        );
-        console.log(
-          `⏳ Email cooldown: ${timeLeft}s remaining (prevents spam)`
-        );
+        const timeLeft = Math.ceil((EMAIL_COOLDOWN - (now - lastEmailSent)) / 1000);
+        console.log(`⏳ Email/Pushsafer cooldown: ${timeLeft}s remaining (prevents spam)`);
       }
     }
 
