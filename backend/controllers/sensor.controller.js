@@ -198,22 +198,44 @@ const getSensorReadingLastHour = async (req, res) => {
 // ✅ THÊM: Lấy giá trị trung bình tất cả cảm biến
 const getSensorAverages = async (req, res) => {
   try {
-    console.log("📊 Calculating sensor averages...");
+    // ✅ THÊM: Lấy hours từ query params
+    const hours = req.query.hours ? parseInt(req.query.hours) : null;
 
-    // ✅ CÁCH 1: Dùng MongoDB Aggregation (HIỆU QUẢ)
-    const averages = await Sensor.aggregate([
-      {
-        $group: {
-          _id: null, // Nhóm tất cả documents
-          avgTemperature: { $avg: "$temperature" },
-          avgHumidity: { $avg: "$humidity" },
-          avgCO2: { $avg: "$co2" },
-          avgCO: { $avg: "$co" },
-          avgPM25: { $avg: "$pm25" },
-          totalRecords: { $sum: 1 }, // Đếm số lượng records
+    console.log("📊 Calculating sensor averages...");
+    if (hours) {
+      console.log(`🕒 Filtering data from last ${hours} hours`);
+    }
+
+    // ✅ THÊM: Build aggregation pipeline với optional time filter
+    const pipeline = [];
+
+    // ✅ THÊM: Match stage nếu có hours
+    if (hours) {
+      const timeLimit = new Date(Date.now() - hours * 60 * 60 * 1000);
+      pipeline.push({
+        $match: {
+          timestamp: { $gte: timeLimit },
         },
+      });
+    }
+
+    // ✅ Group stage
+    pipeline.push({
+      $group: {
+        _id: null,
+        avgTemperature: { $avg: "$temperature" },
+        avgHumidity: { $avg: "$humidity" },
+        avgCO2: { $avg: "$co2" },
+        avgCO: { $avg: "$co" },
+        avgPM25: { $avg: "$pm25" },
+        totalRecords: { $sum: 1 },
+        oldestRecord: { $min: "$timestamp" }, // ✅ THÊM
+        newestRecord: { $max: "$timestamp" }, // ✅ THÊM
       },
-    ]);
+    });
+
+    // ✅ Execute aggregation
+    const averages = await Sensor.aggregate(pipeline);
 
     // ✅ Kiểm tra có data không
     if (!averages || averages.length === 0) {
@@ -233,7 +255,7 @@ const getSensorAverages = async (req, res) => {
 
     const result = averages[0];
 
-    // ✅ Format kết quả (làm tròn 2 chữ số thập phân)
+    // ✅ Format kết quả
     const formattedResult = {
       temperature: parseFloat(result.avgTemperature?.toFixed(2) || 0),
       humidity: parseFloat(result.avgHumidity?.toFixed(2) || 0),
@@ -241,13 +263,20 @@ const getSensorAverages = async (req, res) => {
       co: parseFloat(result.avgCO?.toFixed(2) || 0),
       pm25: parseFloat(result.avgPM25?.toFixed(2) || 0),
       totalRecords: result.totalRecords || 0,
+      timeRange: {
+        // ✅ THÊM
+        from: result.oldestRecord || null,
+        to: result.newestRecord || null,
+      },
     };
 
     console.log("✅ Sensor averages calculated:", formattedResult);
 
     res.status(200).json({
       success: true,
-      message: "Sensor averages retrieved successfully",
+      message: hours
+        ? `Sensor averages for last ${hours} hours`
+        : "Sensor averages for all data",
       data: formattedResult,
     });
   } catch (error) {

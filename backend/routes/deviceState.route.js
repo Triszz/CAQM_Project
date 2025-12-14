@@ -9,19 +9,20 @@ const {
 } = require("../controllers/deviceState.controller");
 const requireAuth = require("../middlewares/requireAuth");
 
+router.use(requireAuth);
 // ✅ Lấy tất cả trạng thái
-router.get("/", requireAuth, getAllDeviceStates);
+router.get("/", getAllDeviceStates);
 
 // ✅ Lấy trạng thái của 1 device
-router.get("/:deviceType", requireAuth, getDeviceState);
+router.get("/:deviceType", getDeviceState);
 
 // ✅ Cập nhật LED brightness
-router.put("/led/brightness", requireAuth, updateLedBrightness);
+router.put("/led/brightness", updateLedBrightness);
 
 // ✅ Cập nhật Buzzer config
-router.put("/buzzer/config", requireAuth, updateBuzzerConfig);
+router.put("/buzzer/config", updateBuzzerConfig);
 
 // ✅ Test buzzer
-router.post("/buzzer/test", requireAuth, testBuzzer);
+router.post("/buzzer/test", testBuzzer);
 
 module.exports = router;

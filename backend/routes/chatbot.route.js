@@ -7,6 +7,9 @@ const {
   clearHistory,
 } = require("../controllers/chatbot.controller");
 
+const requireAuth = require("../middlewares/requireAuth");
+
+router.use(requireAuth);
 // ✅ Send message to chatbot
 router.post("/message", sendMessage);
 

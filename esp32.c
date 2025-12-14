@@ -2,12 +2,11 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <DHT.h>
+#include <WiFiManager.h>
+#include <LiquidCrystal_I2C.h>
 
 // ======================== WIFI & MQTT CONFIG ========================
 #define STUDENT_ID "23127503"
-
-const char* ssid = "YOUR_WIFI_SSID";           // ✅ Thay bằng WiFi của bạn
-const char* password = "YOUR_WIFI_PASSWORD";   // ✅ Thay bằng mật khẩu WiFi
 
 const char* mqtt_server = "broker.hivemq.com";
 const int mqtt_port = 1883;
@@ -18,14 +17,20 @@ const char* TOPIC_DEVICE_CONTROL = "device/control/" STUDENT_ID;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+// ======================== LCD CONFIG ========================
+#define LCD_ADDRESS 0x27 
+#define LCD_COLS 16
+#define LCD_ROWS 2
+LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLS, LCD_ROWS);
+
 // ======================== PIN DEFINITIONS ========================
 #define GREEN_LED_PIN 25
-#define YELLOW_LED_PIN 26
-#define RED_LED_PIN 27
+#define YELLOW_LED_PIN 33
+#define RED_LED_PIN 32
 #define BUZZER_PIN 14
 
 #define DHT_PIN 4
-#define DHT_TYPE DHT22
+#define DHT_TYPE DHT11
 DHT dht(DHT_PIN, DHT_TYPE);
 
 #define MQ135_PIN 34
@@ -37,7 +42,7 @@ HardwareSerial pmsSerial(2);
 
 // ======================== GLOBAL VARIABLES ========================
 unsigned long lastPublish = 0;
-const unsigned long PUBLISH_INTERVAL = 1000;
+const unsigned long PUBLISH_INTERVAL = 3000; // ✅ SỬA: 3 giây (giảm tải)
 
 float temperature = 0;
 float humidity = 0;
@@ -45,116 +50,169 @@ int co2 = 0;
 float co = 0;
 float pm25 = 0;
 
-int currentBrightness = 75;      // Độ sáng hiện tại
-String currentColor = "green";   // Màu hiện tại
+// Biến cho LCD
+unsigned long lastLCDSwitch = 0;
+const unsigned long LCD_INTERVAL = 3000; // Đổi trang LCD mỗi 3 giây
+int lcdPage = 0; // Trang hiện tại (0, 1, 2)
+
+int currentBrightness = 75;      
+String currentColor = "green";   
 
 // ======================== HELPER FUNCTIONS ========================
-// Chuyển đổi brightness (0-100) sang PWM (0-255)
 int brightnessToPWM(int brightness) {
   return map(brightness, 0, 100, 0, 255);
 }
 
-// Set LED với màu và độ sáng
 void setLED(String color, int brightness) {
   int pwmValue = brightnessToPWM(brightness);
 
   if (color == "green") {
-    ledcWrite(0, pwmValue);  // Green ON
-    ledcWrite(1, 0);          // Yellow OFF
-    ledcWrite(2, 0);          // Red OFF
+    ledcWrite(GREEN_LED_PIN, pwmValue);  
+    ledcWrite(YELLOW_LED_PIN, 0);          
+    ledcWrite(RED_LED_PIN, 0);          
   }
   else if (color == "yellow") {
-    ledcWrite(0, 0);          // Green OFF
-    ledcWrite(1, pwmValue);   // Yellow ON
-    ledcWrite(2, 0);          // Red OFF
+    ledcWrite(GREEN_LED_PIN, 0);          
+    ledcWrite(YELLOW_LED_PIN, pwmValue);   
+    ledcWrite(RED_LED_PIN, 0);          
   }
   else if (color == "red") {
-    ledcWrite(0, 0);          // Green OFF
-    ledcWrite(1, 0);          // Yellow OFF
-    ledcWrite(2, pwmValue);   // Red ON
+    ledcWrite(GREEN_LED_PIN, 0);          
+    ledcWrite(YELLOW_LED_PIN, 0);          
+    ledcWrite(RED_LED_PIN, pwmValue);   
   }
 
   currentBrightness = brightness;
   currentColor = color;
-  Serial.printf("💡 LED: %s at %d%% brightness (PWM: %d)\n", color.c_str(), brightness, pwmValue);
+  Serial.printf(" LED: %s at %d%% brightness (PWM: %d)\n", color.c_str(), brightness, pwmValue);
+}
+
+// Hàm hiển thị lên LCD (Chạy luân phiên các trang)
+void displayOnLCD() {
+  unsigned long now = millis();
+
+  // Kiểm tra thời gian để chuyển trang
+  if (now - lastLCDSwitch >= LCD_INTERVAL) {
+    lastLCDSwitch = now;
+    lcdPage++;
+    if (lcdPage > 2) lcdPage = 0; // Có 3 trang: 0, 1, 2
+    lcd.clear(); // Xóa màn hình khi chuyển trang
+  }
+
+  if (lcdPage == 0) {
+    // === TRANG 1: NHIỆT ĐỘ & ĐỘ ẨM ===
+    lcd.setCursor(0, 0);
+    lcd.print("Temp: "); lcd.print(temperature, 1); lcd.print("C");
+    
+    lcd.setCursor(0, 1);
+    lcd.print("Hum : "); lcd.print(humidity, 1); lcd.print("%");
+  } 
+  else if (lcdPage == 1) {
+    // === TRANG 2: KHÍ CO2 & CO ===
+    lcd.setCursor(0, 0);
+    lcd.print("CO2 : "); lcd.print(co2); lcd.print("ppm");
+    
+    lcd.setCursor(0, 1);
+    lcd.print("CO  : "); lcd.print(co, 1); lcd.print("ppm");
+  } 
+  else {
+    // === TRANG 3: BỤI & TRẠNG THÁI ===
+    lcd.setCursor(0, 0);
+    lcd.print("PM2.5: "); lcd.print(pm25, 0); lcd.print("ug");
+    
+    lcd.setCursor(0, 1);
+    lcd.print("Air: "); 
+    String displayColor = currentColor;
+    displayColor.toUpperCase();
+    lcd.print(displayColor);
+  }
+}
+
+void configModeCallback (WiFiManager *myWiFiManager) {
+  Serial.println(" Entered config mode");
+  Serial.println(" Access Point: " + myWiFiManager->getConfigPortalSSID());
+  Serial.println(" IP: " + WiFi.softAPIP().toString());
+  
+  // Beep 2 lần để báo hiệu chế độ cấu hình
+  for (int i = 0; i < 2; i++) {
+    digitalWrite(BUZZER_PIN, HIGH); 
+    delay(100); 
+    digitalWrite(BUZZER_PIN, LOW);
+    delay(100);
+  }
 }
 
 // ======================== SETUP ========================
 void setup() {
-  Serial.begin(115200);
-  Serial.println("\n🚀 ESP32 Air Quality Monitor Starting...");
+  Serial.begin(9600);
+  Serial.println("\n ESP32 Air Quality Monitor Starting...");
 
-  // ✅ Setup LED pins với PWM
-  ledcSetup(0, 5000, 8); // Channel 0, 5kHz, 8-bit resolution
-  ledcSetup(1, 5000, 8); // Channel 1
-  ledcSetup(2, 5000, 8); // Channel 2
+  // Setup LCD
+  Wire.begin(21, 22); // SDA=21, SCL=22
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0); lcd.print("System Starting");
+  lcd.setCursor(0, 1); lcd.print("Please wait...");
 
-  ledcAttachPin(GREEN_LED_PIN, 0);
-  ledcAttachPin(YELLOW_LED_PIN, 1);
-  ledcAttachPin(RED_LED_PIN, 2);
+  // ✅ ESP32 Core 3.x: ledcAttach(pin, freq, res)
+  ledcAttach(GREEN_LED_PIN, 5000, 8);
+  ledcAttach(YELLOW_LED_PIN, 5000, 8);
+  ledcAttach(RED_LED_PIN, 5000, 8);
 
-  // ✅ Đèn xanh sáng mặc định với brightness 75%
   setLED("green", 75);
 
-  // ✅ Setup Buzzer
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
 
-  // ✅ Setup DHT sensor
   dht.begin();
-
-  // ✅ Setup PMS5003 (PM2.5 sensor)
   pmsSerial.begin(9600, SERIAL_8N1, PMS_RX, PMS_TX);
 
-  // ✅ Connect to WiFi
-  setupWiFi();
+  // ✅ WiFiManager Setup
+  WiFiManager wm;
+  wm.setAPCallback(configModeCallback);
+  
+  // wm.resetSettings(); // Uncomment để xóa WiFi đã lưu
 
-  // ✅ Setup MQTT
+  String apName = "ESP32_Config_" + String(STUDENT_ID);
+  Serial.println(" Connecting to WiFi via WiFiManager...");
+  
+  if (!wm.autoConnect(apName.c_str())) {
+    Serial.println(" Failed to connect, restarting...");
+    ESP.restart();
+    delay(1000);
+  }
+
+  Serial.println("\n WiFi connected!");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  
+  // Beep 1 lần dài khi kết nối thành công
+  digitalWrite(BUZZER_PIN, HIGH); 
+  delay(500); 
+  digitalWrite(BUZZER_PIN, LOW);
+
+  // ✅ MQTT Setup
   client.setServer(mqtt_server, mqtt_port);
+  client.setBufferSize(1024);
   client.setCallback(mqttCallback);
 
-  Serial.println("✅ Setup complete!");
-}
-
-// ======================== WIFI CONNECTION ========================
-void setupWiFi() {
-  delay(10);
-  Serial.print("📡 Connecting to WiFi: ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
-
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n✅ WiFi connected!");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\n❌ WiFi connection failed!");
-  }
+  Serial.println(" Setup complete!");
 }
 
 // ======================== MQTT RECONNECT ========================
 void reconnect() {
   while (!client.connected()) {
-    Serial.print("🔄 Connecting to MQTT broker...");
-
+    Serial.print(" Connecting to MQTT broker...");
     String clientId = "ESP32_" + String(STUDENT_ID);
 
     if (client.connect(clientId.c_str())) {
-      Serial.println(" ✅ Connected!");
+      Serial.println("  Connected!");
       client.subscribe(TOPIC_DEVICE_CONTROL);
-      Serial.printf("📡 Subscribed to: %s\n", TOPIC_DEVICE_CONTROL);
+      Serial.printf(" Subscribed to: %s\n", TOPIC_DEVICE_CONTROL);
     } else {
-      Serial.print(" ❌ Failed, rc=");
+      Serial.print("  Failed, rc=");
       Serial.print(client.state());
-      Serial.println(" Retrying in 5 seconds...");
+      Serial.println(" Retrying in 5s...");
       delay(5000);
     }
   }
@@ -162,62 +220,75 @@ void reconnect() {
 
 // ======================== MQTT CALLBACK ========================
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  Serial.printf("\n📥 Message received on topic: %s\n", topic);
-
+  Serial.printf("\n========================================\n");
+  Serial.printf(" Topic: %s\n", topic);
+  
+  // ✅ THÊM: In ra payload để debug
+  Serial.print(" Payload: ");
+  for (unsigned int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+  Serial.println("========================================");
+  
   StaticJsonDocument<512> doc;
   DeserializationError error = deserializeJson(doc, payload, length);
 
   if (error) {
-    Serial.print("❌ JSON parsing failed: ");
+    Serial.print(" JSON Error: ");
     Serial.println(error.c_str());
     return;
   }
 
   const char* device = doc["device"];
   const char* action = doc["action"];
+  
+  // ✅ THÊM: In ra device và action
+  Serial.printf(" Device: %s\n", device ? device : "NULL");
+  Serial.printf(" Action: %s\n", action ? action : "NULL");
 
-  // ✅ Đổi màu LED (từ AI - giữ nguyên brightness)
+  // ✅ LED: Set color (từ AI)
   if (strcmp(device, "led") == 0 && strcmp(action, "set_color") == 0) {
     const char* color = doc["color"];
-    
-    // ✅ SỬA: Kiểm tra xem có brightness trong payload không
     int brightness = doc.containsKey("brightness") ? doc["brightness"].as<int>() : currentBrightness;
-    
     const char* quality = doc["quality"];
-
+    
     setLED(String(color), brightness);
-    Serial.printf("🤖 AI changed LED to %s (Quality: %s)\n", color, quality);
+    Serial.printf(" AI: LED %s (Quality: %s)\n", color, quality ? quality : "N/A");
   }
-
-  // ✅ Đổi brightness (từ Settings - giữ nguyên màu)
+  
+  // ✅ LED: Set brightness (từ Settings)
   else if (strcmp(device, "led") == 0 && strcmp(action, "set_brightness") == 0) {
     int brightness = doc["brightness"];
-    
-    // ✅ SỬA: Kiểm tra xem có color trong payload không
     String color = doc.containsKey("color") ? String((const char*)doc["color"]) : currentColor;
-
+    
     setLED(color, brightness);
-    Serial.printf("👤 User changed brightness to %d%%\n", brightness);
+    Serial.printf(" User: Brightness %d%%\n", brightness);
   }
-
-  // ✅ Buzzer alert (tự động khi air quality kém)
+  
+  // ✅ SỬA: Buzzer ALERT (AI tự động khi air quality kém)
   else if (strcmp(device, "buzzer") == 0 && strcmp(action, "alert") == 0) {
     int beepCount = doc["config"]["beepCount"];
     int beepDuration = doc["config"]["beepDuration"];
     int interval = doc["config"]["interval"];
-
-    Serial.printf("🚨 ALERT: Air quality poor! Buzzer: %d beeps\n", beepCount);
+    
+    Serial.printf(" ALERT: Air quality poor! Buzzer %d beeps\n", beepCount);
     beepPattern(beepCount, beepDuration, interval);
   }
-
-  // ✅ Buzzer test (từ Settings)
+  
+  // ✅ SỬA: Buzzer TEST (User click Test trong Settings)
   else if (strcmp(device, "buzzer") == 0 && strcmp(action, "test") == 0) {
     int beepCount = doc["config"]["beepCount"];
     int beepDuration = doc["config"]["beepDuration"];
     int interval = doc["config"]["interval"];
-
-    Serial.printf("🔔 Buzzer TEST: %d beeps\n", beepCount);
+    
+    Serial.printf(" TEST: Buzzer %d beeps\n", beepCount);
     beepPattern(beepCount, beepDuration, interval);
+  }
+  
+  // ⚠️ Unknown device/action
+  else {
+    Serial.println(" Unknown device or action!");
   }
 }
 
@@ -232,33 +303,29 @@ void beepPattern(int beepCount, int beepDuration, int interval) {
       delay(interval);
     }
   }
-  Serial.printf("✅ Buzzer finished: %d beeps\n", beepCount);
+  Serial.printf(" Buzzer finished: %d beeps\n", beepCount);
 }
 
 // ======================== READ SENSORS ========================
 void readSensors() {
-  // 1. DHT22 - Temperature & Humidity
   temperature = dht.readTemperature();
   humidity = dht.readHumidity();
 
-  if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("❌ DHT22 read error!");
-    temperature = 25.0;
-    humidity = 60.0;
+  if (isnan(temperature) || isnan(humidity)) { 
+    Serial.println(" DHT22 read error!");
+    temperature = 0.0; 
+    humidity = 0.0; 
   }
 
-  // 2. MQ-135 - CO2
   int mq135_raw = analogRead(MQ135_PIN);
   co2 = map(mq135_raw, 0, 4095, 400, 2000);
 
-  // 3. MQ-7 - CO
   int mq7_raw = analogRead(MQ7_PIN);
   co = map(mq7_raw, 0, 4095, 0, 50) / 10.0;
 
-  // 4. PMS5003 - PM2.5
   pm25 = readPM25();
 
-  Serial.printf("📊 Temp: %.1f°C, Humidity: %.1f%%, CO2: %dppm, CO: %.1fppm, PM2.5: %.1fµg/m³\n",
+  Serial.printf(" T:%.1f H:%.1f CO2:%d CO:%.1f PM2.5:%.1f\n", 
                 temperature, humidity, co2, co, pm25);
 }
 
@@ -267,34 +334,31 @@ float readPM25() {
   if (pmsSerial.available() >= 32) {
     byte buffer[32];
     pmsSerial.readBytes(buffer, 32);
-
+    
     if (buffer[0] == 0x42 && buffer[1] == 0x4d) {
-      int pm25_raw = (buffer[12] << 8) | buffer[13];
+      int pm25_raw = (buffer[12] << 8) | buffer[13]; // ✅ SỬA: Thêm 8
       return pm25_raw;
     }
   }
-
-  return 20.0;
+  return 0;
 }
 
 // ======================== PUBLISH SENSOR DATA ========================
 void publishSensorData() {
   StaticJsonDocument<256> doc;
-
   doc["temperature"] = temperature;
   doc["humidity"] = humidity;
   doc["co2"] = co2;
   doc["co"] = co;
   doc["pm25"] = pm25;
-
+  
   char buffer[256];
   serializeJson(doc, buffer);
-
+  
   if (client.publish(TOPIC_SENSOR_DATA, buffer)) {
-    Serial.printf("📤 Published to %s\n", TOPIC_SENSOR_DATA);
-    Serial.println(buffer);
+    Serial.printf(" Published to %s\n", TOPIC_SENSOR_DATA);
   } else {
-    Serial.println("❌ Publish failed!");
+    Serial.println(" Publish failed!");
   }
 }
 
@@ -308,8 +372,9 @@ void loop() {
   unsigned long now = millis();
   if (now - lastPublish >= PUBLISH_INTERVAL) {
     lastPublish = now;
-
     readSensors();
     publishSensorData();
   }
+
+  displayOnLCD();
 }

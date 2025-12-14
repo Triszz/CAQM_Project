@@ -17,7 +17,7 @@ function Home({ chatMessages, setChatMessages }) {
 
   const [realtimeData, setRealtimeData] = useState([]);
   const maxRealtimePoints = 1200;
-  // ✅ useEffect 0: Load và update Air Quality mỗi 3 giây
+  // ✅ useEffect 1: Load và update Air Quality mỗi 3 giây
   useEffect(() => {
     if (!user?.token) return;
 
@@ -45,7 +45,7 @@ function Home({ chatMessages, setChatMessages }) {
     return () => clearInterval(airQualityInterval);
   }, [user?.token]); // ✅ CHỈ phụ thuộc vào user.token
 
-  // ✅ useEffect 1: Load dữ liệu 1 giờ ban đầu
+  // ✅ useEffect 2: Load dữ liệu 1 giờ ban đầu
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user?.token) return;
@@ -89,49 +89,25 @@ function Home({ chatMessages, setChatMessages }) {
     };
 
     loadInitialData();
-  }, [user?.token]);
+  }, [user?.token, maxRealtimePoints]);
 
-  // ✅ useEffect 2: Cập nhật GAUGE mỗi 1 giây (real-time)
+  // ✅ useEffect 3: Cập nhật CẢ GAUGE VÀ CHART mỗi 3 giây
   useEffect(() => {
     if (!user?.token) return;
 
-    const updateGauges = async () => {
+    const updateSensorData = async () => {
       try {
         const response = await SensorAPI.getLatestSensorReading();
         const data = response.data.data;
 
-        // ✅ Chỉ update gauges (không update chart)
+        // ✅ 1. Update gauges
         setTemperature(data.temperature);
         setHumidity(data.humidity);
         setCo2(data.co2);
         setCo(data.co);
         setPm25(data.pm25);
 
-        console.log(`🔄 [${new Date().toLocaleTimeString()}] Gauges updated`);
-      } catch (error) {
-        console.error("Failed to fetch sensor data:", error);
-      }
-    };
-
-    // Chạy ngay lần đầu
-    updateGauges();
-
-    // ✅ Interval 1 giây cho gauges
-    const gaugeInterval = setInterval(updateGauges, 1000);
-
-    return () => clearInterval(gaugeInterval);
-  }, [user?.token]);
-
-  // ✅ useEffect 3: Cập nhật LINE CHART mỗi 3 giây
-  useEffect(() => {
-    if (!user?.token) return;
-
-    const updateLineChart = async () => {
-      try {
-        const response = await SensorAPI.getLatestSensorReading();
-        const data = response.data.data;
-
-        // ✅ Chỉ update line chart
+        // ✅ 2. Update chart
         const newPoint = {
           time: new Date().toLocaleTimeString("vi-VN", {
             hour: "2-digit",
@@ -147,6 +123,7 @@ function Home({ chatMessages, setChatMessages }) {
 
         setRealtimeData((prev) => {
           const updated = [...prev, newPoint];
+          // Giữ tối đa maxRealtimePoints điểm
           if (updated.length > maxRealtimePoints) {
             return updated.slice(-maxRealtimePoints);
           }
@@ -154,80 +131,21 @@ function Home({ chatMessages, setChatMessages }) {
         });
 
         console.log(
-          `📊 [${new Date().toLocaleTimeString()}] Line chart updated`
+          `🔄 [${new Date().toLocaleTimeString()}] Gauges & Chart updated`
         );
       } catch (error) {
-        console.error("Failed to update line chart:", error);
+        console.error("❌ Failed to update sensor data:", error);
       }
     };
 
-    // Chờ 3 giây rồi mới bắt đầu (tránh conflict với load initial)
-    const timeoutId = setTimeout(() => {
-      updateLineChart();
+    // ✅ Chạy ngay lần đầu (sau khi load initial data)
+    updateSensorData();
 
-      // ✅ Interval 3 giây cho line chart
-      const chartInterval = setInterval(updateLineChart, 3000);
+    // ✅ Interval 3 giây
+    const sensorInterval = setInterval(updateSensorData, 3000);
 
-      return () => clearInterval(chartInterval);
-    }, 3000);
-
-    return () => clearTimeout(timeoutId);
+    return () => clearInterval(sensorInterval);
   }, [user?.token, maxRealtimePoints]);
-
-  // // ✅ useEffect 2: Cập nhật CẢ GAUGE VÀ CHART mỗi 3 giây
-  // useEffect(() => {
-  //   if (!user?.token) return;
-
-  //   const updateSensorData = async () => {
-  //     try {
-  //       const response = await SensorAPI.getLatestSensorReading();
-  //       const data = response.data;
-
-  //       // ✅ Update gauges
-  //       setTemperature(data.temperature);
-  //       setHumidity(data.humidity);
-  //       setCo2(data.co2);
-  //       setCo(data.co);
-  //       setPm25(data.pm25);
-
-  //       // ✅ Update chart
-  //       const newPoint = {
-  //         time: new Date().toLocaleTimeString("vi-VN", {
-  //           hour: "2-digit",
-  //           minute: "2-digit",
-  //           second: "2-digit",
-  //         }),
-  //         co2: data.co2,
-  //         temperature: data.temperature,
-  //         humidity: data.humidity,
-  //         pm25: data.pm25,
-  //         co: data.co,
-  //       };
-
-  //       setRealtimeData((prev) => {
-  //         const updated = [...prev, newPoint];
-  //         if (updated.length > maxRealtimePoints) {
-  //           return updated.slice(-maxRealtimePoints);
-  //         }
-  //         return updated;
-  //       });
-
-  //       console.log(
-  //         `📊 [${new Date().toLocaleTimeString()}] Gauges & Chart updated`
-  //       );
-  //     } catch (error) {
-  //       console.error("Failed to fetch sensor data:", error);
-  //     }
-  //   };
-
-  //   // Chạy ngay lần đầu
-  //   updateSensorData();
-
-  //   // ✅ Interval 3 giây cho CẢ gauges VÀ chart
-  //   const sensorInterval = setInterval(updateSensorData, 3000);
-
-  //   return () => clearInterval(sensorInterval);
-  // }, [user?.token, maxRealtimePoints]);
 
   return (
     <div className="home-page">

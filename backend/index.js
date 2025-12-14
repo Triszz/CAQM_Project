@@ -22,6 +22,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// ✅ Khởi động MQTT subscriber
+const mqttSubscriber = require("./mqtt/subscriber");
+
 // routes
 app.use("/api", userRouter);
 app.use("/api/sensor", sensorRouter);
@@ -29,9 +32,6 @@ app.use("/api/device-state", deviceStateRouter);
 app.use("/api/air-quality", airQualityRouter);
 app.use("/api/email", emailRoutes);
 app.use("/api/chatbot", chatbotRouter);
-
-// ✅ Khởi động MQTT subscriber
-const mqttSubscriber = require("./mqtt/subscriber");
 
 // connect
 const PORT = process.env.PORT || 3000;

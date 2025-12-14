@@ -10,17 +10,52 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const tools = [
   {
     functionDeclarations: [
+      // ✅ TOOL 1: Lấy data MỚI NHẤT (cho "hiện tại", "bây giờ")
+      {
+        name: "getLatestSensorData",
+        description: `Lấy dữ liệu CẢM BIẾN MỚI NHẤT (real-time, hiện tại).
+
+SỬ DỤNG TOOL NÀY KHI:
+- User hỏi về "hiện tại", "bây giờ", "lúc này", "thời điểm này"
+- User muốn biết giá trị CHÍNH XÁC của cảm biến tại thời điểm hiện tại
+- User hỏi "nhiệt độ/độ ẩm/CO2 hiện tại là bao nhiêu?"
+
+KHÔNG SỬ DỤNG tool này khi user hỏi về trung bình hoặc xu hướng.
+
+Trả về: 1 record mới nhất từ database (không phải trung bình).`,
+        parameters: {
+          type: "object",
+          properties: {},
+          required: [],
+        },
+      },
+
+      // ✅ TOOL 2: Tính TRUNG BÌNH (cho "hôm nay", "1 giờ qua", "xu hướng")
       {
         name: "getSensorAverages",
-        description:
-          "Lấy giá trị trung bình của các cảm biến chất lượng không khí (nhiệt độ, độ ẩm, CO2, CO, PM2.5). Sử dụng khi người dùng hỏi về tình trạng không khí, chất lượng môi trường, hoặc yêu cầu đánh giá không khí.",
+        description: `Lấy giá trị TRUNG BÌNH của các cảm biến trong khoảng thời gian.
+
+SỬ DỤNG TOOL NÀY KHI:
+- User hỏi về "hôm nay", "24h qua", "1 giờ qua", "tuần này"
+- User muốn biết XU HƯỚNG, TRUNG BÌNH, hoặc TỔNG QUAN
+- User hỏi "chất lượng không khí hôm nay thế nào?"
+- User hỏi "nhiệt độ trung bình 24h qua"
+
+KHÔNG SỬ DỤNG tool này khi user hỏi về "hiện tại", "bây giờ".
+
+CÁCH XÁC ĐỊNH THAM SỐ hours:
+- "hôm nay", "24h qua" → hours=24
+- "1 giờ qua", "giờ vừa rồi" → hours=1
+- "3 giờ qua" → hours=3
+- "tuần này", "7 ngày qua" → hours=168
+- "tổng quan", không đề cập thời gian → không truyền hours`,
         parameters: {
           type: "object",
           properties: {
             hours: {
               type: "number",
               description:
-                "Số giờ muốn lấy dữ liệu trung bình (ví dụ: 1, 24, 168). Nếu không có, sẽ lấy tất cả dữ liệu.",
+                "Số giờ muốn lấy dữ liệu trung bình. Ví dụ: 1, 3, 24, 168. Nếu không truyền, sẽ lấy tất cả dữ liệu.",
             },
           },
           required: [],
@@ -33,30 +68,58 @@ const tools = [
 // ✅ Hàm thực thi tool (GIỐNG Y HỆT HÀM CONTROLLER)
 async function executeTool(functionName, args) {
   console.log(`🔧 Executing tool: ${functionName}`);
-  console.log("📥 Arguments:", args);
+  console.log(`📥 Arguments:`, args);
 
-  if (functionName === "getSensorAverages") {
-    try {
-      const hours = args.hours || null;
+  try {
+    // ✅ TOOL 1: Lấy data MỚI NHẤT
+    if (functionName === "getLatestSensorData") {
+      const latestData = await Sensor.findOne()
+        .sort({ timestamp: -1 }) // ← Sắp xếp theo thời gian giảm dần
+        .limit(1)
+        .lean();
 
-      // ✅ Build aggregation pipeline
-      let matchStage = {};
-      if (hours) {
-        const timeLimit = new Date(Date.now() - hours * 60 * 60 * 1000);
-        matchStage = {
-          timestamp: { $gte: timeLimit },
+      if (!latestData) {
+        return {
+          success: false,
+          message: "No sensor data found",
+          data: null,
         };
-        console.log(`🕒 Filtering data from last ${hours} hours`);
       }
+
+      const formattedData = {
+        temperature: parseFloat(latestData.temperature?.toFixed(2) || 0),
+        humidity: parseFloat(latestData.humidity?.toFixed(2) || 0),
+        co2: Math.round(latestData.co2 || 0),
+        co: parseFloat(latestData.co?.toFixed(2) || 0),
+        pm25: parseFloat(latestData.pm25?.toFixed(2) || 0),
+        timestamp: latestData.timestamp,
+      };
+
+      console.log("✅ Latest sensor data:", formattedData);
+
+      return {
+        success: true,
+        message: "Latest sensor data retrieved",
+        data: formattedData,
+      };
+    }
+
+    // ✅ TOOL 2: Tính TRUNG BÌNH (code cũ)
+    if (functionName === "getSensorAverages") {
+      const hours = args.hours || null;
 
       const pipeline = [];
 
-      // Thêm match stage nếu có filter thời gian
-      if (Object.keys(matchStage).length > 0) {
-        pipeline.push({ $match: matchStage });
+      if (hours) {
+        const timeLimit = new Date(Date.now() - hours * 60 * 60 * 1000);
+        pipeline.push({
+          $match: {
+            timestamp: { $gte: timeLimit },
+          },
+        });
+        console.log(`🕒 Filtering data from last ${hours} hours`);
       }
 
-      // Group và tính average
       pipeline.push({
         $group: {
           _id: null,
@@ -71,13 +134,12 @@ async function executeTool(functionName, args) {
         },
       });
 
-      // ✅ Execute aggregation
       const averages = await Sensor.aggregate(pipeline);
 
       if (!averages || averages.length === 0) {
         return {
           success: false,
-          message: "Không có dữ liệu cảm biến",
+          message: "No sensor data found",
           data: {
             temperature: 0,
             humidity: 0,
@@ -91,7 +153,6 @@ async function executeTool(functionName, args) {
 
       const result = averages[0];
 
-      // ✅ Format kết quả
       const formattedResult = {
         temperature: parseFloat(result.avgTemperature?.toFixed(2) || 0),
         humidity: parseFloat(result.avgHumidity?.toFixed(2) || 0),
@@ -109,21 +170,24 @@ async function executeTool(functionName, args) {
 
       return {
         success: true,
+        message: hours
+          ? `Sensor averages for last ${hours} hours`
+          : "Sensor averages for all data",
         data: formattedResult,
       };
-    } catch (error) {
-      console.error("❌ Error in getSensorAverages:", error);
-      return {
-        success: false,
-        error: error.message,
-      };
     }
-  }
 
-  return {
-    success: false,
-    error: "Unknown function",
-  };
+    return {
+      success: false,
+      message: `Unknown tool: ${functionName}`,
+    };
+  } catch (error) {
+    console.error(`❌ Error executing tool ${functionName}:`, error);
+    return {
+      success: false,
+      message: `Error: ${error.message}`,
+    };
+  }
 }
 
 // ✅ Hàm chat với Gemini
@@ -145,6 +209,24 @@ Bạn có thể:
 2. Đánh giá và phân tích dữ liệu cảm biến
 3. Đưa ra khuyến nghị dựa trên các chỉ số
 4. Nhận xét thời tiết dựa trên giá trị cảm biến
+
+Bạn có 2 TOOLS:
+1. getLatestSensorData: Lấy dữ liệu CẢM BIẾN MỚI NHẤT (1 điểm đo)
+2. getSensorAverages: Tính TRUNG BÌNH các cảm biến trong khoảng thời gian
+
+QUAN TRỌNG - Chọn tool phù hợp:
+
+Dùng getLatestSensorData khi user hỏi:
+- "Nhiệt độ hiện tại", "nhiệt độ bây giờ"
+- "Độ ẩm hiện tại", "CO2 lúc này"
+- "Chất lượng không khí lúc này thế nào?"
+- Bất kỳ câu hỏi nào có từ: "hiện tại", "bây giờ", "lúc này", "thời điểm này"
+
+Dùng getSensorAverages khi user hỏi:
+- "Nhiệt độ hôm nay thế nào?" → hours=24
+- "Chất lượng không khí 1 giờ qua" → hours=1
+- "Đánh giá không khí tuần này" → hours=168
+- "Xu hướng nhiệt độ", "trung bình", "tổng quan"
 
 Ngưỡng đánh giá:
 - Nhiệt độ: 18-25°C là tốt

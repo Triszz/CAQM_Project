@@ -11,7 +11,7 @@ const { getMqttClient, isMqttConnected } = require("../config/mqtt.client");
 let lastEmailSent = 0;
 const EMAIL_COOLDOWN = 5 * 60 * 1000; // 5 phút
 
-// ✅ Hàm gọi AI (tạm thời dùng logic đơn giản)
+// ✅ Hàm gọi AI
 async function predictAirQuality(sensorData) {
   try {
     const { co2, co, pm25, temperature, humidity } = sensorData;
