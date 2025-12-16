@@ -3,14 +3,14 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Sensor = require("../models/sensor.model");
 
-// ✅ Khởi tạo Gemini
+// Khởi tạo Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ✅ Định nghĩa tools (functions) cho Gemini
+// Định nghĩa tools (functions) cho Gemini
 const tools = [
   {
     functionDeclarations: [
-      // ✅ TOOL 1: Lấy data MỚI NHẤT (cho "hiện tại", "bây giờ")
+      // TOOL 1: Lấy data MỚI NHẤT (cho "hiện tại", "bây giờ")
       {
         name: "getLatestSensorData",
         description: `Lấy dữ liệu CẢM BIẾN MỚI NHẤT (real-time, hiện tại).
@@ -18,7 +18,7 @@ const tools = [
 SỬ DỤNG TOOL NÀY KHI:
 - User hỏi về "hiện tại", "bây giờ", "lúc này", "thời điểm này"
 - User muốn biết giá trị CHÍNH XÁC của cảm biến tại thời điểm hiện tại
-- User hỏi "nhiệt độ/độ ẩm/CO2 hiện tại là bao nhiêu?"
+- User hỏi "nhiệt độ/độ ẩm/CO2/CO/PM2.5 hiện tại là bao nhiêu?"
 
 KHÔNG SỬ DỤNG tool này khi user hỏi về trung bình hoặc xu hướng.
 
@@ -30,7 +30,7 @@ Trả về: 1 record mới nhất từ database (không phải trung bình).`,
         },
       },
 
-      // ✅ TOOL 2: Tính TRUNG BÌNH (cho "hôm nay", "1 giờ qua", "xu hướng")
+      // TOOL 2: Tính TRUNG BÌNH (cho "hôm nay", "1 giờ qua", "xu hướng")
       {
         name: "getSensorAverages",
         description: `Lấy giá trị TRUNG BÌNH của các cảm biến trong khoảng thời gian.
@@ -65,13 +65,13 @@ CÁCH XÁC ĐỊNH THAM SỐ hours:
   },
 ];
 
-// ✅ Hàm thực thi tool (GIỐNG Y HỆT HÀM CONTROLLER)
+// Hàm thực thi tool (GIỐNG Y HỆT HÀM CONTROLLER)
 async function executeTool(functionName, args) {
-  console.log(`🔧 Executing tool: ${functionName}`);
-  console.log(`📥 Arguments:`, args);
+  console.log(`Executing tool: ${functionName}`);
+  console.log(`Arguments:`, args);
 
   try {
-    // ✅ TOOL 1: Lấy data MỚI NHẤT
+    // TOOL 1: Lấy data MỚI NHẤT
     if (functionName === "getLatestSensorData") {
       const latestData = await Sensor.findOne()
         .sort({ timestamp: -1 }) // ← Sắp xếp theo thời gian giảm dần
@@ -95,7 +95,7 @@ async function executeTool(functionName, args) {
         timestamp: latestData.timestamp,
       };
 
-      console.log("✅ Latest sensor data:", formattedData);
+      console.log("Latest sensor data:", formattedData);
 
       return {
         success: true,
@@ -104,7 +104,7 @@ async function executeTool(functionName, args) {
       };
     }
 
-    // ✅ TOOL 2: Tính TRUNG BÌNH (code cũ)
+    // TOOL 2: Tính TRUNG BÌNH (code cũ)
     if (functionName === "getSensorAverages") {
       const hours = args.hours || null;
 
@@ -117,7 +117,7 @@ async function executeTool(functionName, args) {
             timestamp: { $gte: timeLimit },
           },
         });
-        console.log(`🕒 Filtering data from last ${hours} hours`);
+        console.log(`Filtering data from last ${hours} hours`);
       }
 
       pipeline.push({
@@ -166,7 +166,7 @@ async function executeTool(functionName, args) {
         },
       };
 
-      console.log("✅ Sensor averages:", formattedResult);
+      console.log("Sensor averages:", formattedResult);
 
       return {
         success: true,
@@ -182,7 +182,7 @@ async function executeTool(functionName, args) {
       message: `Unknown tool: ${functionName}`,
     };
   } catch (error) {
-    console.error(`❌ Error executing tool ${functionName}:`, error);
+    console.error(`Error executing tool ${functionName}:`, error);
     return {
       success: false,
       message: `Error: ${error.message}`,
@@ -190,19 +190,19 @@ async function executeTool(functionName, args) {
   }
 }
 
-// ✅ Hàm chat với Gemini
+// Hàm chat với Gemini
 async function chat(userMessage, conversationHistory = []) {
   try {
     console.log("\n========== GEMINI CHAT ==========");
     console.log("👤 User:", userMessage);
 
-    // ✅ Dùng gemini-2.5-flash (mới nhất, hỗ trợ function calling)
+    // Dùng gemini-2.5-flash (mới nhất, hỗ trợ function calling)
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash", // ✅ Hoặc "gemini-2.5-flash" nếu có
+      model: "gemini-2.5-flash",
       tools: tools,
     });
 
-    // ✅ System instruction
+    // System instruction
     const systemPrompt = `Bạn là AI Assistant chuyên về chất lượng không khí. 
 Bạn có thể:
 1. Trả lời câu hỏi về chất lượng không khí
@@ -237,7 +237,7 @@ Ngưỡng đánh giá:
 
 Hãy trả lời bằng ngôn ngữ theo truy vấn người dùng, ngắn gọn, dễ hiểu và thân thiện.`;
 
-    // ✅ Tạo chat session với system prompt
+    // Tạo chat session với system prompt
     const chatHistory = [
       {
         role: "user",
@@ -262,22 +262,22 @@ Hãy trả lời bằng ngôn ngữ theo truy vấn người dùng, ngắn gọn
       },
     });
 
-    // ✅ Gửi message
+    // Gửi message
     let result = await chat.sendMessage(userMessage);
     let response = result.response;
 
-    console.log("🤖 Gemini response received");
+    console.log("Gemini response received");
 
-    // ✅ Kiểm tra có function call không
+    // Kiểm tra có function call không
     let functionCalls = response.functionCalls();
 
     if (functionCalls && functionCalls.length > 0) {
-      console.log("🔧 Function calls detected:", functionCalls.length);
+      console.log("Function calls detected:", functionCalls.length);
 
       const functionResponses = [];
 
       for (const call of functionCalls) {
-        console.log(`📞 Calling: ${call.name}`, call.args);
+        console.log(`Calling: ${call.name}`, call.args);
 
         const toolResult = await executeTool(call.name, call.args);
 
@@ -289,16 +289,16 @@ Hãy trả lời bằng ngôn ngữ theo truy vấn người dùng, ngắn gọn
         });
       }
 
-      // ✅ Gửi kết quả tool về cho Gemini
+      // Gửi kết quả tool về cho Gemini
       result = await chat.sendMessage(functionResponses);
       response = result.response;
 
-      console.log("✅ Gemini analyzed tool results");
+      console.log("Gemini analyzed tool results");
     }
 
-    // ✅ Lấy text response
+    // Lấy text response
     const text = response.text();
-    console.log("🤖 Final response:", text.substring(0, 100) + "...");
+    console.log("Final response:", text.substring(0, 100) + "...");
     console.log("========================================\n");
 
     return {
@@ -307,26 +307,26 @@ Hãy trả lời bằng ngôn ngữ theo truy vấn người dùng, ngắn gọn
       conversationHistory: await chat.getHistory(),
     };
   } catch (error) {
-    console.error("❌ Gemini chat error:", error);
+    console.error("Gemini chat error:", error);
 
-    // ✅ Xử lý các loại lỗi
+    // Xử lý các loại lỗi
     let errorMessage =
       "Xin lỗi, tôi gặp lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.";
 
     if (error.status === 404) {
-      console.error("💡 Model không tồn tại hoặc không hỗ trợ");
+      console.error("Model không tồn tại hoặc không hỗ trợ");
       errorMessage =
         "Xin lỗi, AI model hiện không khả dụng. Vui lòng thử lại sau.";
     } else if (error.status === 429) {
-      console.error("💡 Quota exceeded");
+      console.error("Quota exceeded");
       const retryAfter = error.errorDetails?.[2]?.retryDelay || "1 phút";
-      console.log(`⏳ Retry after: ${retryAfter}`);
+      console.log(`Retry after: ${retryAfter}`);
       errorMessage = `Xin lỗi, hệ thống đang quá tải. Vui lòng thử lại sau ${retryAfter}.`;
     } else if (error.status === 500) {
-      console.error("💡 Gemini server error");
+      console.error("Gemini server error");
       errorMessage = "Xin lỗi, AI đang gặp sự cố. Vui lòng thử lại sau.";
     } else if (error.status === 400) {
-      console.error("💡 Bad request:", error.message);
+      console.error("Bad request:", error.message);
       errorMessage = "Xin lỗi, yêu cầu không hợp lệ. Vui lòng thử lại.";
     }
 

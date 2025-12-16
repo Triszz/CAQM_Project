@@ -4,14 +4,14 @@ const AirQuality = require("../models/airQuality.model");
 const DeviceState = require("../models/deviceState.model");
 const mqtt = require("mqtt");
 const MQTT_TOPICS = require("../config/mqtt.config");
-const { sendAirQualityAlert } = require("./emailService"); // ✅ ĐÃ CÓ
+const { sendAirQualityAlert } = require("./emailService");
 const { getMqttClient, isMqttConnected } = require("../config/mqtt.client");
 
-// ✅ THÊM: Biến lưu trạng thái email (tránh spam)
+// THÊM: Biến lưu trạng thái email (tránh spam)
 let lastEmailSent = 0;
 const EMAIL_COOLDOWN = 5 * 60 * 1000; // 5 phút
 
-// ✅ Hàm gọi AI
+// Hàm gọi AI
 async function predictAirQuality(sensorData) {
   try {
     const { co2, co, pm25, temperature, humidity } = sensorData;
@@ -27,8 +27,8 @@ async function predictAirQuality(sensorData) {
       throw new Error("Missing required sensor fields");
     }
 
-    // ✅ TEST MODE: Force "Kém" để test buzzer + LED + email
-    // console.log("🧪 TEST MODE: Forcing quality to 'Kém'");
+    // TEST MODE: Force "Kém" để test buzzer + LED + email
+    // console.log("TEST MODE: Forcing quality to 'Kém'");
     // return {
     //   quality: "Kém",
     //   confidence: 0.95,
@@ -49,7 +49,7 @@ async function predictAirQuality(sensorData) {
     //     },
     //   ],
     // };
-    // 🔗 Gọi Python Decision Tree API
+    // Gọi Python Decision Tree API
     const response = await fetch(
       process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
       {
@@ -79,12 +79,12 @@ async function predictAirQuality(sensorData) {
       problematicSensors: result.problematic_sensors || [],
     };
   } catch (error) {
-    console.error("❌ AI prediction error:", error);
+    console.error("AI prediction error:", error);
     throw error;
   }
 }
 
-// ✅ Map chất lượng → màu LED
+// Map chất lượng → màu LED
 function getColorForQuality(quality) {
   const colorMap = {
     Tốt: "green",
@@ -94,7 +94,7 @@ function getColorForQuality(quality) {
   return colorMap[quality] || "green";
 }
 
-// ✅ Xử lý sensor data: AI + LED + Buzzer + EMAIL
+// Xử lý sensor data: AI + LED + Buzzer + EMAIL
 // services/airQualityService.js
 
 async function processSensorData(sensorData) {
@@ -107,7 +107,7 @@ async function processSensorData(sensorData) {
     );
 
     console.log(
-      `🤖 AI: ${quality} (confidence: ${confidence}) - Problematic sensors: ${
+      `AI: ${quality} (confidence: ${confidence}) - Problematic sensors: ${
         problematicSensors.length > 0
           ? problematicSensors.map((s) => s.sensor).join(", ")
           : "None"
@@ -131,7 +131,7 @@ async function processSensorData(sensorData) {
     mqttClient.publish(MQTT_TOPICS.DEVICE_CONTROL, JSON.stringify(ledPayload), {
       qos: 1,
     });
-    console.log(`💡 LED changed to: ${ledColor}`);
+    console.log(`LED changed to: ${ledColor}`);
 
     await DeviceState.findOneAndUpdate(
       { deviceType: "led" },
@@ -151,22 +151,22 @@ async function processSensorData(sensorData) {
 
     if (quality === "Kém") {
       console.log("\n========== POOR AIR QUALITY DETECTED ==========");
-      console.log("🔍 MQTT connected?", isMqttConnected());
+      console.log("MQTT connected?", isMqttConnected());
 
       if (!isMqttConnected()) {
-        console.error("❌ MQTT not connected! Cannot send buzzer alert.");
+        console.error("MQTT not connected! Cannot send buzzer alert.");
         console.log("   Skipping buzzer trigger...");
       } else {
-        console.log("✅ MQTT is connected");
+        console.log("MQTT is connected");
 
         const buzzerState = await DeviceState.findOne({ deviceType: "buzzer" });
 
-        console.log("🔍 Buzzer state:", buzzerState);
+        console.log("Buzzer state:", buzzerState);
 
         if (buzzerState) {
           const { beepCount, beepDuration, interval } = buzzerState.buzzerState;
 
-          console.log("🔍 Buzzer config:", {
+          console.log("Buzzer config:", {
             beepCount,
             beepDuration,
             interval,
@@ -186,7 +186,7 @@ async function processSensorData(sensorData) {
             timestamp: new Date().toISOString(),
           };
 
-          console.log("📤 Publishing buzzer alert to MQTT...");
+          console.log("Publishing buzzer alert to MQTT...");
           console.log("   Topic:", MQTT_TOPICS.DEVICE_CONTROL);
           console.log("   Payload:", JSON.stringify(buzzerPayload, null, 2));
 
@@ -198,9 +198,9 @@ async function processSensorData(sensorData) {
             { qos: 1 },
             (err) => {
               if (err) {
-                console.error("❌ MQTT publish error:", err);
+                console.error("MQTT publish error:", err);
               } else {
-                console.log("✅ Buzzer alert published successfully!");
+                console.log("Buzzer alert published successfully!");
               }
             }
           );
@@ -208,18 +208,18 @@ async function processSensorData(sensorData) {
           buzzerTriggered = true;
           buzzerConfig = { beepCount, beepDuration, interval };
 
-          // ✅ DI CHUYỂN LOG VÀO ĐÂY
-          console.log(`🚨 Buzzer alert SENT: ${beepCount} beeps`);
+          // DI CHUYỂN LOG VÀO ĐÂY
+          console.log(`Buzzer alert SENT: ${beepCount} beeps`);
 
           await DeviceState.findOneAndUpdate(
             { deviceType: "buzzer" },
             { $set: { "buzzerState.lastTriggered": new Date() } }
           );
         } else {
-          console.error("❌ Buzzer state not found in DB!");
+          console.error("Buzzer state not found in DB!");
           console.log("   Creating default buzzer state...");
 
-          // ✅ THÊM: Tạo default buzzer state nếu chưa có
+          // THÊM: Tạo default buzzer state nếu chưa có
           await DeviceState.create({
             deviceType: "buzzer",
             buzzerState: {
@@ -232,7 +232,7 @@ async function processSensorData(sensorData) {
             lastUpdated: new Date(),
           });
 
-          console.log("✅ Default buzzer state created. Retry on next cycle.");
+          console.log("Default buzzer state created. Retry on next cycle.");
         }
       }
 
@@ -242,7 +242,7 @@ async function processSensorData(sensorData) {
       const now = Date.now();
 
       if (now - lastEmailSent >= EMAIL_COOLDOWN) {
-        console.log("📧 Sending air quality alert email...");
+        console.log("Sending air quality alert email...");
 
         try {
           const userEmail = process.env.ALERT_EMAIL || process.env.EMAIL_USER;
@@ -260,19 +260,19 @@ async function processSensorData(sensorData) {
           if (emailResult.success) {
             lastEmailSent = now;
             emailSent = true;
-            console.log(`✅ Alert email sent to ${userEmail}`);
+            console.log(`Alert email sent to ${userEmail}`);
           } else {
-            console.error("❌ Failed to send alert email:", emailResult.error);
+            console.error("Failed to send alert email:", emailResult.error);
           }
         } catch (emailError) {
-          console.error("❌ Email sending error:", emailError);
+          console.error("Email sending error:", emailError);
         }
       } else {
         const timeLeft = Math.ceil(
           (EMAIL_COOLDOWN - (now - lastEmailSent)) / 1000
         );
         console.log(
-          `⏳ Email cooldown: ${timeLeft}s remaining (prevents spam)`
+          `Email cooldown: ${timeLeft}s remaining (prevents spam)`
         );
       }
     }
@@ -299,7 +299,7 @@ async function processSensorData(sensorData) {
       emailSent,
     };
   } catch (error) {
-    console.error("❌ Error processing sensor data:", error);
+    console.error("Error processing sensor data:", error);
     throw error;
   }
 }

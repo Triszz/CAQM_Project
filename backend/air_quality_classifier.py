@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 import joblib
 import json
 from flask import Flask, request, jsonify
 import logging
+import os
+from collections import Counter
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -14,196 +15,316 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# Tên file models
+MODEL_QUALITY_PATH = "model_quality_custom.pkl"
+MODEL_PROBLEMS_PATH = "model_problems_custom.pkl"
+SCALER_PATH = "scaler_custom.pkl"
+
 # ============================================
-# 1. TRAINING DATA & MODEL
+# 0. CUSTOM DECISION TREE IMPLEMENTATION
+# ============================================
+
+class Node:
+    def __init__(self, feature=None, threshold=None, left=None, right=None, *, value=None, proba=None):
+        self.feature = feature
+        self.threshold = threshold
+        self.left = left
+        self.right = right
+        self.value = value
+        self.proba = proba
+
+    def is_leaf_node(self):
+        return self.value is not None
+
+class SimpleDecisionTree:
+    """
+    Cây quyết định tự xây dựng (Classification Tree) sử dụng Gini Impurity
+    """
+    def __init__(self, min_samples_split=2, max_depth=100, n_features=None):
+        self.min_samples_split = min_samples_split
+        self.max_depth = max_depth
+        self.n_features = n_features
+        self.root = None
+
+    def fit(self, X, y):
+        self.n_features = X.shape[1] if not self.n_features else min(X.shape[1], self.n_features)
+        self.root = self._grow_tree(X, y)
+
+    def _grow_tree(self, X, y, depth=0):
+        n_samples, n_feats = X.shape
+        n_labels = len(np.unique(y))
+
+        # Điều kiện dừng
+        if (depth >= self.max_depth or n_labels == 1 or n_samples < self.min_samples_split):
+            counter = Counter(y)
+            most_common = counter.most_common(1)[0][0]
+            # Tính xác suất cho từng class tại lá này
+            total = len(y)
+            proba = {k: v / total for k, v in counter.items()}
+            return Node(value=most_common, proba=proba)
+
+        feat_idxs = np.random.choice(n_feats, self.n_features, replace=False)
+
+        # Tìm split tốt nhất
+        best_feat, best_thresh = self._best_split(X, y, feat_idxs)
+
+        if best_feat is None: # Không tìm được split nào tốt hơn
+            counter = Counter(y)
+            most_common = counter.most_common(1)[0][0]
+            proba = {k: v / len(y) for k, v in counter.items()}
+            return Node(value=most_common, proba=proba)
+
+        left_idxs, right_idxs = self._split(X[:, best_feat], best_thresh)
+        left = self._grow_tree(X[left_idxs, :], y[left_idxs], depth + 1)
+        right = self._grow_tree(X[right_idxs, :], y[right_idxs], depth + 1)
+        return Node(best_feat, best_thresh, left, right)
+
+    def _best_split(self, X, y, feat_idxs):
+        best_gain = -1
+        split_idx, split_threshold = None, None
+
+        for feat_idx in feat_idxs:
+            X_column = X[:, feat_idx]
+            thresholds = np.unique(X_column)
+
+            # Chỉ thử tối đa 10 threshold ngẫu nhiên để tăng tốc nếu dữ liệu lớn
+            if len(thresholds) > 10:
+                thresholds = np.random.choice(thresholds, 10, replace=False)
+
+            for thr in thresholds:
+                gain = self._information_gain(y, X_column, thr)
+                if gain > best_gain:
+                    best_gain = gain
+                    split_idx = feat_idx
+                    split_threshold = thr
+
+        if best_gain == 0: return None, None # Không có gain nào dương
+        return split_idx, split_threshold
+
+    def _information_gain(self, y, X_column, threshold):
+        # Gini của cha
+        parent_gini = self._gini(y)
+
+        # Tạo split
+        left_idxs, right_idxs = self._split(X_column, threshold)
+        if len(left_idxs) == 0 or len(right_idxs) == 0:
+            return 0
+
+        # Gini có trọng số của con
+        n = len(y)
+        n_l, n_r = len(left_idxs), len(right_idxs)
+        e_l, e_r = self._gini(y[left_idxs]), self._gini(y[right_idxs])
+        child_gini = (n_l / n) * e_l + (n_r / n) * e_r
+
+        return parent_gini - child_gini
+
+    def _split(self, X_column, split_thresh):
+        left_idxs = np.argwhere(X_column <= split_thresh).flatten()
+        right_idxs = np.argwhere(X_column > split_thresh).flatten()
+        return left_idxs, right_idxs
+
+    def _gini(self, y):
+        # 1 - sum(p^2)
+        _, counts = np.unique(y, return_counts=True)
+        probabilities = counts / len(y)
+        return 1 - np.sum(probabilities ** 2)
+
+    def predict(self, X):
+        return np.array([self._traverse_tree(x, self.root) for x in X])
+
+    def predict_proba(self, X):
+        # Trả về list các dict xác suất {label: prob}
+        return [self._traverse_tree_proba(x, self.root) for x in X]
+
+    def _traverse_tree(self, x, node):
+        if node.is_leaf_node():
+            return node.value
+        if x[node.feature] <= node.threshold:
+            return self._traverse_tree(x, node.left)
+        return self._traverse_tree(x, node.right)
+    
+    def _traverse_tree_proba(self, x, node):
+        if node.is_leaf_node():
+            return node.proba
+        if x[node.feature] <= node.threshold:
+            return self._traverse_tree_proba(x, node.left)
+        return self._traverse_tree_proba(x, node.right)
+
+
+class SimpleMultiLabelModel:
+    """
+    Model đa nhãn tự xây dựng (Binary Relevance):
+    Huấn luyện N cây quyết định riêng biệt cho N cột nhãn đầu ra
+    """
+    def __init__(self, max_depth=15):
+        self.models = []
+        self.max_depth = max_depth
+
+    def fit(self, X, y):
+        # y là matrix (n_samples, n_labels)
+        self.models = []
+        n_labels = y.shape[1]
+        for i in range(n_labels):
+            y_col = y[:, i]
+            tree = SimpleDecisionTree(max_depth=self.max_depth)
+            tree.fit(X, y_col)
+            self.models.append(tree)
+
+    def predict(self, X):
+        # Kết quả trả về matrix (n_samples, n_labels)
+        preds = []
+        for tree in self.models:
+            preds.append(tree.predict(X))
+        return np.column_stack(preds)
+
+    def score(self, X, y):
+        # Tính accuracy đơn giản: đúng hết các nhãn mới tính là đúng
+        preds = self.predict(X)
+        correct = np.all(preds == y, axis=1)
+        return np.mean(correct)
+
+
+# ============================================
+# 1. TRAINING DATA GENERATOR (GIỮ NGUYÊN)
 # ============================================
 
 def generate_training_data():
     """
-    Tạo dữ liệu huấn luyện theo những quy tắc cơ bản
+    Tạo dữ liệu huấn luyện Hybrid (Lai)
     """
     np.random.seed(42)
-    
     data = []
-    labels = []
-    
-    # 🟢 "Tốt" - Điều kiện tốt
-    for _ in range(100):
-        co2 = np.random.randint(350, 700)  # < 700
-        co = np.random.uniform(0, 3)       # < 3
-        pm25 = np.random.randint(0, 15)    # < 15
-        temp = np.random.uniform(20, 26)   # 20-26°C
-        humidity = np.random.uniform(40, 60)  # 40-60%
-        data.append([co2, co, pm25, temp, humidity])
-        labels.append("Tốt")
-    
-    # 🟡 "Trung bình" - Điều kiện vừa phải
-    for _ in range(100):
-        co2 = np.random.randint(700, 1000)  # 700-1000
-        co = np.random.uniform(3, 7)        # 3-7
-        pm25 = np.random.randint(15, 35)    # 15-35
-        temp = np.random.choice([np.random.uniform(15, 20), np.random.uniform(26, 32)])
-        humidity = np.random.choice([np.random.uniform(30, 40), np.random.uniform(60, 70)])
-        data.append([co2, co, pm25, temp, humidity])
-        labels.append("Trung bình")
-    
-    # 🔴 "Kém" - Điều kiện xấu
-    for _ in range(100):
-        co2 = np.random.randint(1000, 2000)  # > 1000
-        co = np.random.uniform(7, 15)        # > 7
-        pm25 = np.random.randint(35, 100)    # > 35
-        temp = np.random.choice([np.random.uniform(10, 15), np.random.uniform(32, 40)])
-        humidity = np.random.choice([np.random.uniform(20, 30), np.random.uniform(70, 90)])
-        data.append([co2, co, pm25, temp, humidity])
-        labels.append("Kém")
-    
-    return np.array(data), np.array(labels)
+    labels_quality = []
+    labels_problems = []
 
-def train_model():
-    """
-    Huấn luyện Decision Tree Classifier
-    """
-    logger.info("🤖 Generating training data...")
-    X, y = generate_training_data()
-    
-    # Chia dữ liệu
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+    # CASE 1: TỐT
+    for _ in range(500):
+        co2 = np.random.randint(350, 800)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(0, 25)
+        temp = np.random.uniform(20, 28)
+        hum = np.random.uniform(40, 60)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Tốt")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # CASE 2: TRUNG BÌNH
+    for _ in range(500):
+        co2 = np.random.randint(800, 1000)
+        co = np.random.uniform(5, 9)
+        pm25 = np.random.randint(25, 35)
+        temp = np.random.choice([np.random.uniform(15, 20), np.random.uniform(28, 32)])
+        hum = np.random.choice([np.random.uniform(30, 40), np.random.uniform(60, 70)])
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # CASE 3: KÉM - HỖN HỢP
+    # 3a. Chỉ do CO2
+    for _ in range(200):
+        co2 = np.random.randint(1100, 2500)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(0, 30)
+        temp = np.random.uniform(20, 28)
+        hum = np.random.uniform(40, 60)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([1, 0, 0, 0, 0])
+
+    # 3b. Chỉ do PM2.5
+    for _ in range(200):
+        co2 = np.random.randint(400, 800)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(40, 150)
+        temp = np.random.uniform(20, 28)
+        hum = np.random.uniform(40, 60)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([0, 0, 1, 0, 0])
+
+    # 3c. Chỉ do Nhiệt độ
+    for _ in range(200):
+        co2 = np.random.randint(400, 800)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(0, 30)
+        temp = np.random.uniform(33, 45)
+        hum = np.random.uniform(40, 60)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([0, 0, 0, 1, 0])
+
+    # 3d. Hỗn hợp
+    for _ in range(200):
+        co2 = np.random.randint(1200, 3000)
+        co = np.random.uniform(15, 50)
+        pm25 = np.random.randint(100, 500)
+        temp = np.random.uniform(35, 60)
+        hum = np.random.uniform(20, 30)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([1, 1, 1, 1, 0])
+
+    return np.array(data), np.array(labels_quality), np.array(labels_problems)
+
+# ============================================
+# 2. TRAIN & LOAD CUSTOM MODELS
+# ============================================
+
+def train_models():
+    logger.info("Generating hybrid training data...")
+    X, y_quality, y_problems = generate_training_data()
+
+    X_train, X_test, yq_train, yq_test, yp_train, yp_test = train_test_split(
+        X, y_quality, y_problems, test_size=0.2, random_state=42
     )
-    
-    # Chuẩn hóa dữ liệu
+
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
-    
-    # Huấn luyện Decision Tree
-    logger.info("🌳 Training Decision Tree...")
-    model = DecisionTreeClassifier(
-        max_depth=10,
-        min_samples_split=5,
-        min_samples_leaf=2,
-        random_state=42
-    )
-    model.fit(X_train_scaled, y_train)
-    
-    # Đánh giá
-    accuracy = model.score(X_test_scaled, y_test)
-    logger.info(f"✅ Model accuracy: {accuracy:.2%}")
-    
-    # Lưu model và scaler
-    joblib.dump(model, "air_quality_model.pkl")
-    joblib.dump(scaler, "air_quality_scaler.pkl")
-    logger.info("💾 Model and scaler saved!")
-    
-    return model, scaler
 
-# Load model khi khởi động
+    # --- MODEL 1: QUALITY CLASSIFIER (Custom Decision Tree) ---
+    logger.info("Training Custom Decision Tree for Quality...")
+    # Thay vì RandomForest, ta dùng 1 cây quyết định tự viết
+    clf_quality = SimpleDecisionTree(max_depth=15, min_samples_split=5) 
+    clf_quality.fit(X_train_scaled, yq_train)
+    
+    # Tính accuracy thủ công
+    y_pred = clf_quality.predict(X_test_scaled)
+    acc_q = np.mean(y_pred == yq_test)
+    logger.info(f"Custom Quality Model Accuracy: {acc_q:.2%}")
+
+    # --- MODEL 2: DIAGNOSTIC MODEL (Custom Multi-Label) ---
+    logger.info("Training Custom Multi-Label Model for Diagnostics...")
+    clf_problems = SimpleMultiLabelModel(max_depth=15)
+    clf_problems.fit(X_train_scaled, yp_train)
+    
+    acc_p = clf_problems.score(X_test_scaled, yp_test)
+    logger.info(f"Custom Diagnostic Model Accuracy: {acc_p:.2%}")
+
+    joblib.dump(clf_quality, MODEL_QUALITY_PATH)
+    joblib.dump(clf_problems, MODEL_PROBLEMS_PATH)
+    joblib.dump(scaler, SCALER_PATH)
+    
+    return clf_quality, clf_problems, scaler
+
+# Load models
 try:
-    model = joblib.load("air_quality_model.pkl")
-    scaler = joblib.load("air_quality_scaler.pkl")
-    logger.info("✅ Model loaded from disk")
+    if not os.path.exists(MODEL_QUALITY_PATH):
+        raise FileNotFoundError
+    clf_quality = joblib.load(MODEL_QUALITY_PATH)
+    clf_problems = joblib.load(MODEL_PROBLEMS_PATH)
+    scaler = joblib.load(SCALER_PATH)
+    logger.info("All CUSTOM models loaded successfully.")
 except:
-    logger.info("⚠️  Model not found. Training new model...")
-    model, scaler = train_model()
+    logger.info("Models not found or outdated. Training custom models...")
+    clf_quality, clf_problems, scaler = train_models()
 
 # ============================================
-# 2. LOGIC PHÂN LOẠI & TÌM NGUYÊN NHÂN
+# 3. PREDICTION LOGIC
 # ============================================
 
-def get_problematic_sensors(sensor_data):
-    """
-    Xác định các cảm biến nào gây ra chất lượng không khí kém
-    
-    Tiêu chí:
-    - CO2 > 1000 ppm → Xấu
-    - CO > 7 ppm → Xấu
-    - PM2.5 > 35 μg/m³ → Xấu
-    - Temperature < 15°C hoặc > 32°C → Xấu
-    - Humidity < 30% hoặc > 70% → Xấu
-    """
-    problematic = []
-    
-    co2 = sensor_data.get("co2", 0)
-    co = sensor_data.get("co", 0)
-    pm25 = sensor_data.get("pm25", 0)
-    temperature = sensor_data.get("temperature", 0)
-    humidity = sensor_data.get("humidity", 0)
-    
-    if co2 > 1000:
-        problematic.append({
-            "sensor": "CO2",
-            "value": co2,
-            "unit": "ppm",
-            "threshold": 1000,
-            "severity": "cao" if co2 > 1500 else "trung bình"
-        })
-    
-    if co > 7:
-        problematic.append({
-            "sensor": "CO",
-            "value": round(co, 2),
-            "unit": "ppm",
-            "threshold": 7,
-            "severity": "cao" if co > 10 else "trung bình"
-        })
-    
-    if pm25 > 35:
-        problematic.append({
-            "sensor": "PM2.5",
-            "value": pm25,
-            "unit": "μg/m³",
-            "threshold": 35,
-            "severity": "cao" if pm25 > 75 else "trung bình"
-        })
-    
-    if temperature < 15 or temperature > 32:
-        direction = "cao" if temperature > 32 else "thấp"
-        problematic.append({
-            "sensor": "Nhiệt độ",
-            "value": round(temperature, 1),
-            "unit": "°C",
-            "threshold": f"15-32°C (hiện tại {direction})",
-            "severity": "cao" if (temperature < 10 or temperature > 35) else "trung bình"
-        })
-    
-    if humidity < 30 or humidity > 70:
-        direction = "cao" if humidity > 70 else "thấp"
-        problematic.append({
-            "sensor": "Độ ẩm",
-            "value": round(humidity, 1),
-            "unit": "%",
-            "threshold": f"30-70% (hiện tại {direction})",
-            "severity": "cao" if (humidity < 20 or humidity > 80) else "trung bình"
-        })
-    
-    return problematic
-
-def predict_air_quality(sensor_data):
-    """
-    Dự đoán chất lượng không khí từ dữ liệu cảm biến
-    
-    Input: {
-        "co2": float,
-        "co": float,
-        "pm25": float,
-        "temperature": float,
-        "humidity": float
-    }
-    
-    Output: {
-        "quality": str ("Tốt", "Trung bình", "Kém"),
-        "confidence": float (0-1),
-        "problematic_sensors": list (nếu "Kém")
-    }
-    """
+def predict_logic(sensor_data):
     try:
-        # Validate input
-        required_fields = ["co2", "co", "pm25", "temperature", "humidity"]
-        for field in required_fields:
-            if field not in sensor_data:
-                raise ValueError(f"Missing field: {field}")
-        
-        # Chuẩn bị dữ liệu
         features = np.array([[
             sensor_data["co2"],
             sensor_data["co"],
@@ -212,81 +333,72 @@ def predict_air_quality(sensor_data):
             sensor_data["humidity"]
         ]])
         
-        # Chuẩn hóa
         features_scaled = scaler.transform(features)
         
-        # Dự đoán
-        prediction = model.predict(features_scaled)[0]
-        probabilities = model.predict_proba(features_scaled)[0]
+        # 1. Predict Quality
+        quality_pred_arr = clf_quality.predict(features_scaled)
+        quality_pred = quality_pred_arr[0]
         
-        # Lấy confidence (xác suất cao nhất)
-        confidence = float(np.max(probabilities))
+        # Lấy confidence (xác suất cao nhất của class dự đoán)
+        proba_dict_list = clf_quality.predict_proba(features_scaled)
+        proba_dict = proba_dict_list[0] # Dict {label: prob}
+        # Nếu dict trả về rỗng hoặc lỗi, default 1.0
+        quality_proba = proba_dict.get(quality_pred, 0.0)
+
+        # 2. Predict Problems
+        problems_pred_matrix = clf_problems.predict(features_scaled) 
+        problems_vector = problems_pred_matrix[0]
+
+        problematic_sensors = []
+        sensor_names = ["CO2", "CO", "PM2.5", "Nhiệt độ", "Độ ẩm"]
+        sensor_keys = ["co2", "co", "pm25", "temperature", "humidity"]
+        units = ["ppm", "ppm", "μg/m³", "°C", "%"]
         
-        result = {
-            "quality": prediction,
-            "confidence": round(confidence, 3),
-            "sensor_values": {
-                "co2": sensor_data["co2"],
-                "co": sensor_data["co"],
-                "pm25": sensor_data["pm25"],
-                "temperature": sensor_data["temperature"],
-                "humidity": sensor_data["humidity"]
-            }
+        for i, is_bad in enumerate(problems_vector):
+            if is_bad == 1:
+                problematic_sensors.append({
+                    "sensor": sensor_names[i],
+                    "value": sensor_data[sensor_keys[i]],
+                    "unit": units[i],
+                    "threshold": "AI Detected",
+                    "severity": "cao"
+                })
+
+        return {
+            "quality": quality_pred,
+            "confidence": round(quality_proba, 2),
+            "problematic_sensors": problematic_sensors,
+            "sensor_values": sensor_data
         }
-        
-        # Nếu "Kém" → thêm danh sách cảm biến gây vấn đề
-        if prediction == "Kém":
-            result["problematic_sensors"] = get_problematic_sensors(sensor_data)
-        
-        return result
-        
+
     except Exception as e:
-        logger.error(f"❌ Prediction error: {e}")
-        raise
+        logger.error(f"Prediction logic error: {e}")
+        raise e
 
 # ============================================
-# 3. FLASK API
+# 4. API ENDPOINTS (Giữ nguyên)
 # ============================================
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    """
-    API endpoint để dự đoán chất lượng không khí
-    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
     try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
-        
-        result = predict_air_quality(data)
-        return jsonify(result), 200
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        required = ["co2", "co", "pm25", "temperature", "humidity"]
+        for field in required:
+            if field not in data:
+                return jsonify({"error": f"Missing field: {field}"}), 400 
+        result = predict_logic(data)
+        return jsonify(result)
     except Exception as e:
-        logger.error(f"❌ API error: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/health", methods=["GET"])
-def health():
-    """
-    Health check endpoint
-    """
-    return jsonify({"status": "ok", "message": "Air Quality Service is running"}), 200
-
-@app.route("/model-info", methods=["GET"])
-def model_info():
-    """
-    Thông tin về model
-    """
-    return jsonify({
-        "model_type": "DecisionTreeClassifier",
-        "features": ["CO2", "CO", "PM2.5", "Temperature", "Humidity"],
-        "classes": ["Tốt", "Trung bình", "Kém"],
-        "status": "ready"
-    }), 200
+@app.route("/retrain", methods=["POST"])
+def retrain():
+    global clf_quality, clf_problems, scaler
+    clf_quality, clf_problems, scaler = train_models()
+    return jsonify({"message": "Custom models retrained successfully"}), 200
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting Air Quality Classifier Service...")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000)
