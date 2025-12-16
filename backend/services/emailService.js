@@ -12,6 +12,13 @@ const sendAirQualityAlert = async (userEmail, username, sensorData) => {
   try {
     const { temperature, humidity, co2, co, pm25, quality } = sensorData;
 
+    // ✅ DEBUG: Log input
+    console.log("📧 [Email] Starting sendAirQualityAlert...");
+    console.log("   Recipient:", userEmail);
+    console.log("   Username:", username);
+    console.log("   Quality:", quality);
+    console.log("   Data:", { temperature, humidity, co2, co, pm25 });
+
     // ✅ Nội dung email (HTML)
     const htmlContent = `
       <!DOCTYPE html>
@@ -97,9 +104,7 @@ const sendAirQualityAlert = async (userEmail, username, sensorData) => {
               </tr>
               <tr>
                 <td>🏭 CO₂</td>
-                <td><strong>${co2} ppm</strong> ${
-      co2 > 1000 ? '<span class="warning">(Cao)</span>' : ""
-    }</td>
+                <td><strong>${co2} ppm</strong> ${co2 > 1000 ? '<span class="warning">(Cao)</span>' : ""}</td>
               </tr>
               <tr>
                 <td>☠️ CO</td>
@@ -171,19 +176,36 @@ const sendAirQualityAlert = async (userEmail, username, sensorData) => {
       `,
     };
 
+    // ✅ DEBUG: Log email details
+    console.log("📝 [Email] Email config:");
+    console.log("   From:", mailOptions.from.address);
+    console.log("   To:", mailOptions.to);
+    console.log("   Subject:", mailOptions.subject);
+    console.log("   Content type: HTML + Text");
+
     // ✅ Gửi email
+    console.log("🔄 [Email] Sending via transporter...");
     const info = await transporter.sendMail(mailOptions);
 
-    console.log("✅ Email sent:", info.messageId);
+    console.log("✅ [Email] Sent successfully!");
+    console.log("   Message ID:", info.messageId);
+    console.log("   Response:", info.response);
+
     return {
       success: true,
       messageId: info.messageId,
+      response: info.response,
     };
   } catch (error) {
-    console.error("❌ Error sending email:", error);
+    console.error("❌ [Email] Send error:", error);
+    console.error("   Error type:", error.constructor.name);
+    console.error("   Error message:", error.message);
+    console.error("   Error code:", error.code);
+
     return {
       success: false,
       error: error.message,
+      errorCode: error.code,
     };
   }
 };
