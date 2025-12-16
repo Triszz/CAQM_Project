@@ -4,10 +4,11 @@ const AirQuality = require("../models/airQuality.model");
 const DeviceState = require("../models/deviceState.model");
 const mqtt = require("mqtt");
 const MQTT_TOPICS = require("../config/mqtt.config");
-const { sendAirQualityAlert } = require("./emailService");
+const { sendAirQualityAlert } = require("./emailService"); // ✅ ĐÃ CÓ
 const { getMqttClient, isMqttConnected } = require("../config/mqtt.client");
+const { sendPushsaferAlert } = require("./pushsafer.service");
 
-// THÊM: Biến lưu trạng thái email (tránh spam)
+// ✅ THÊM: Biến lưu trạng thái email (tránh spam)
 let lastEmailSent = 0;
 const EMAIL_COOLDOWN = 5 * 60 * 1000; // 5 phút
 
@@ -248,6 +249,7 @@ async function processSensorData(sensorData) {
           const userEmail = process.env.ALERT_EMAIL || process.env.EMAIL_USER;
           const username = "User";
 
+          // 4.1 Gửi email
           const emailResult = await sendAirQualityAlert(userEmail, username, {
             temperature: sensorData.temperature,
             humidity: sensorData.humidity,
@@ -256,6 +258,13 @@ async function processSensorData(sensorData) {
             pm25: sensorData.pm25,
             quality: quality,
           });
+
+          // 4.2 Gửi push qua Pushsafer (không làm hỏng flow nếu lỗi)
+          try {
+            await sendPushsaferAlert(sensorData, quality);
+          } catch (psError) {
+            console.error("❌ Pushsafer sending error:", psError);
+          }
 
           if (emailResult.success) {
             lastEmailSent = now;
@@ -271,9 +280,7 @@ async function processSensorData(sensorData) {
         const timeLeft = Math.ceil(
           (EMAIL_COOLDOWN - (now - lastEmailSent)) / 1000
         );
-        console.log(
-          `Email cooldown: ${timeLeft}s remaining (prevents spam)`
-        );
+        console.log(`Email cooldown: ${timeLeft}s remaining (prevents spam)`);
       }
     }
 
