@@ -47,17 +47,24 @@ const AirQualitySchema = new mongoose.Schema(
     // Danh sách cảm biến gây ra chất lượng không khí kém (chỉ có khi quality = "Kém")
     problematicSensors: [
       {
-        sensor: String,        // "CO2", "CO", "PM2.5", "Nhiệt độ", "Độ ẩm"
-        value: Number,         // Giá trị hiện tại
-        unit: String,          // "ppm", "μg/m³", "°C", "%"
-        threshold: String,     // Giới hạn bình thường
-        severity: String,      // "cao", "trung bình"
+        sensor: String, // "CO2", "CO", "PM2.5", "Nhiệt độ", "Độ ẩm"
+        value: Number, // Giá trị hiện tại
+        unit: String, // "ppm", "μg/m³", "°C", "%"
+        threshold: String, // Giới hạn bình thường
+        severity: String, // "cao", "trung bình"
       },
     ],
+
+    emailSent: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
 
     timestamp: {
       type: Date,
       default: Date.now,
+      index: true,
     },
   },
   {

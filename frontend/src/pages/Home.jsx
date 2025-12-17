@@ -157,15 +157,15 @@ function Home({ chatMessages, setChatMessages }) {
           Settings
         </Link>
       </div>
-      {quality === "TỐT" ? (
+      {quality === "Tốt" ? (
         <div className="quality-container good-quality-container">
           <h3>Chất lượng không khí {quality}</h3>
         </div>
-      ) : quality === "TRUNG BÌNH" ? (
+      ) : quality === "Trung bình" ? (
         <div className="quality-container medium-quality-container">
           <h3>Chất lượng không khí {quality}</h3>
         </div>
-      ) : quality === "TỆ" ? (
+      ) : quality === "Kém" ? (
         <div className="quality-container bad-quality-container">
           <h3>Chất lượng không khí {quality}</h3>
         </div>
@@ -177,27 +177,30 @@ function Home({ chatMessages, setChatMessages }) {
       <div className="charts-grid">
         <Gauge
           id="co2-gauge"
-          title="Nồng độ CO₂"
+          title="CO₂"
           value={co2}
           minValue={0}
-          maxValue={2000}
+          maxValue={2500}
           unit="ppm"
+          customThresholds={[800, 1000]}
         />
         <Gauge
           id="co-gauge"
-          title="Nồng độ CO"
+          title="CO"
           value={co}
           minValue={0}
           maxValue={50}
           unit="ppm"
+          customThresholds={[5, 9]}
         />
         <Gauge
           id="temp-gauge"
           title="Nhiệt độ"
           value={temperature}
-          minValue={0}
-          maxValue={50}
+          minValue={15}
+          maxValue={45}
           unit="°C"
+          customThresholds={[30, 34]}
         />
         <Gauge
           id="humidity-gauge"
@@ -206,14 +209,16 @@ function Home({ chatMessages, setChatMessages }) {
           minValue={0}
           maxValue={100}
           unit="%"
+          humidityMode={true}
         />
         <Gauge
           id="pm25-gauge"
-          title="Bụi mịn PM2.5"
+          title="PM2.5"
           value={pm25}
           minValue={0}
-          maxValue={100}
+          maxValue={200}
           unit="µg/m³"
+          customThresholds={[25, 35]}
         />
       </div>
       <div className="realtime-section">

@@ -28,20 +28,20 @@ async function predictAirQuality(sensorData) {
     }
 
     // Test kem
-    const response = await fetch(
-      process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          co2: 1500,
-          co: 15,
-          pm25: 50,
-          temperature: 40,
-          humidity: 95,
-        }),
-      }
-    );
+    // const response = await fetch(
+    //   process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
+    //   {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({
+    //       co2: 1500,
+    //       co: 15,
+    //       pm25: 50,
+    //       temperature: 40,
+    //       humidity: 95,
+    //     }),
+    //   }
+    // );
 
     // Test trung binh
     // const response = await fetch(
@@ -60,20 +60,20 @@ async function predictAirQuality(sensorData) {
     // );
 
     // Gọi Python Decision Tree API
-    // const response = await fetch(
-    //   process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
-    //   {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify({
-    //       co2,
-    //       co,
-    //       pm25,
-    //       temperature,
-    //       humidity,
-    //     }),
-    //   }
-    // );
+    const response = await fetch(
+      process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          co2,
+          co,
+          pm25,
+          temperature,
+          humidity,
+        }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(
@@ -103,32 +103,66 @@ function getColorForQuality(quality) {
   };
   return colorMap[quality] || "green";
 }
-async function checkEmailCooldown() {
+
+async function canSendEmailNow() {
   try {
-    // Lấy lần email cuối từ DB
-    const lastAlert = await AirQuality.findOne({ emailSent: true })
-      .sort({ timestamp: -1 })
-      .select("timestamp");
+    const now = new Date();
+    const cooldownTime = new Date(now.getTime() - EMAIL_COOLDOWN);
 
-    if (!lastAlert) {
-      return { canSend: true, timeLeft: 0 }; // Chưa từng gửi email
-    }
+    // ✅ Tìm email cuối cùng GỬI TRONG 5 PHÚT QUA
+    const recentAlert = await AirQuality.findOne({
+      emailSent: true,
+      timestamp: { $gte: cooldownTime }, // Trong 5 phút qua
+    }).sort({ timestamp: -1 });
 
-    const now = Date.now();
-    const lastSentTime = new Date(lastAlert.timestamp).getTime();
-    const timeSinceLastEmail = now - lastSentTime;
-
-    if (timeSinceLastEmail >= EMAIL_COOLDOWN) {
-      return { canSend: true, timeLeft: 0 };
-    } else {
-      const timeLeft = Math.ceil((EMAIL_COOLDOWN - timeSinceLastEmail) / 1000);
+    if (recentAlert) {
+      const timeLeft = Math.ceil(
+        (EMAIL_COOLDOWN -
+          (now.getTime() - new Date(recentAlert.timestamp).getTime())) /
+          1000
+      );
+      console.log(
+        `⏳ [Email Cooldown] Last email sent ${Math.floor(
+          (now.getTime() - new Date(recentAlert.timestamp).getTime()) / 1000
+        )}s ago. Cooldown: ${timeLeft}s remaining.`
+      );
       return { canSend: false, timeLeft };
     }
+
+    console.log("✅ [Email Cooldown] No recent emails found. Can send.");
+    return { canSend: true, timeLeft: 0 };
   } catch (error) {
-    console.error("Error checking email cooldown:", error);
-    return { canSend: true, timeLeft: 0 }; // Mặc định cho phép gửi nếu lỗi
+    console.error("❌ Error checking email cooldown:", error);
+    return { canSend: false, timeLeft: 300 }; // ✅ THAY ĐỔI: Mặc định KHÔNG cho phép gửi nếu lỗi
   }
 }
+
+// async function checkEmailCooldown() {
+//   try {
+//     // Lấy lần email cuối từ DB
+//     const lastAlert = await AirQuality.findOne({ emailSent: true })
+//       .sort({ timestamp: -1 })
+//       .select("timestamp");
+
+//     if (!lastAlert) {
+//       return { canSend: true, timeLeft: 0 }; // Chưa từng gửi email
+//     }
+
+//     const now = Date.now();
+//     const lastSentTime = new Date(lastAlert.timestamp).getTime();
+//     const timeSinceLastEmail = now - lastSentTime;
+
+//     if (timeSinceLastEmail >= EMAIL_COOLDOWN) {
+//       return { canSend: true, timeLeft: 0 };
+//     } else {
+//       const timeLeft = Math.ceil((EMAIL_COOLDOWN - timeSinceLastEmail) / 1000);
+//       return { canSend: false, timeLeft };
+//     }
+//   } catch (error) {
+//     console.error("Error checking email cooldown:", error);
+//     return { canSend: true, timeLeft: 0 }; // Mặc định cho phép gửi nếu lỗi
+//   }
+// }
 
 // Xử lý sensor data: AI + LED + Buzzer + EMAIL
 // services/airQualityService.js
@@ -261,8 +295,8 @@ async function processSensorData(sensorData) {
 
       console.log("===============================================\n");
 
-      // 3.2 EMAIL - ✅ SỬA: Kiểm tra cooldown từ DB
-      const cooldownStatus = await checkEmailCooldown();
+      // 3.2 EMAIL - ✅ SỬA: Kiểm tra cooldown TRƯỚC KHI gửi
+      const cooldownStatus = await canSendEmailNow();
 
       if (cooldownStatus.canSend) {
         console.log(
@@ -270,7 +304,25 @@ async function processSensorData(sensorData) {
         );
         console.log("📬 EMAIL & PUSHSAFER ALERT BLOCK");
         console.log("═══════════════════════════════════════════════════════");
-        console.log("Sending air quality alert email...");
+
+        // ✅ THÊM: LƯU VÀO DB TRƯỚC KHI GỬI EMAIL (để block các requests tiếp theo)
+        const preEmailRecord = await AirQuality.create({
+          sensorData,
+          quality,
+          confidence,
+          ledColor,
+          buzzerTriggered,
+          buzzerConfig,
+          problematicSensors,
+          emailSent: false, // ← Chưa gửi, nhưng đã reserve slot
+          timestamp: new Date(),
+        });
+
+        console.log(
+          "📝 Pre-email record created (ID:",
+          preEmailRecord._id,
+          ")"
+        );
 
         try {
           const userEmail = process.env.ALERT_EMAIL || process.env.EMAIL_USER;
@@ -278,7 +330,7 @@ async function processSensorData(sensorData) {
 
           console.log("\n--- 4.1 EMAIL ATTEMPT ---");
 
-          // ✅ SỬA: Truyền problematicSensors vào email
+          // Gửi email
           const emailResult = await sendAirQualityAlert(userEmail, username, {
             temperature: sensorData.temperature,
             humidity: sensorData.humidity,
@@ -286,19 +338,33 @@ async function processSensorData(sensorData) {
             co: sensorData.co,
             pm25: sensorData.pm25,
             quality: quality,
-            problematicSensors: problematicSensors, // ← ✅ THÊM
+            problematicSensors: problematicSensors,
           });
 
           console.log("\n--- 4.1 EMAIL RESULT ---");
           console.log("Success:", emailResult.success);
           console.log("Message ID:", emailResult.messageId || "N/A");
-          console.log("Response:", emailResult.response || "N/A");
+
+          // ✅ UPDATE: Cập nhật record sau khi gửi email
+          if (emailResult.success) {
+            await AirQuality.findByIdAndUpdate(preEmailRecord._id, {
+              emailSent: true, // ← Gửi thành công
+            });
+            emailSent = true;
+            console.log("\n✅ Alert email sent to:", userEmail);
+          } else {
+            // ✅ Nếu gửi thất bại, xóa record để không block lần sau
+            await AirQuality.findByIdAndDelete(preEmailRecord._id);
+            console.error("\n❌ Failed to send email. Record deleted.");
+          }
 
           console.log("\n--- 4.2 PUSHSAFER ATTEMPT ---");
+
+          // Gửi Pushsafer
           const pushsaferResult = await sendPushsaferAlert(
             {
               ...sensorData,
-              problematicSensors: problematicSensors, // ← ✅ THÊM
+              problematicSensors: problematicSensors,
             },
             quality
           );
@@ -308,25 +374,30 @@ async function processSensorData(sensorData) {
           console.log("Sent:", pushsaferResult.sent);
           console.log("Message:", pushsaferResult.message);
 
-          if (emailResult.success) {
-            emailSent = true;
-            console.log("\n✅ Alert email sent to:", userEmail);
-          } else {
-            console.error(
-              "\n❌ Failed to send alert email:",
-              emailResult.error
-            );
-          }
-
           console.log(
             "═══════════════════════════════════════════════════════\n"
           );
         } catch (emailError) {
           console.error("\n❌ Email/Pushsafer block error:", emailError);
+
+          // ✅ Nếu có lỗi, xóa record để không block lần sau
+          await AirQuality.findByIdAndDelete(preEmailRecord._id);
+          console.log("   Pre-email record deleted due to error.");
+
           console.log(
             "═══════════════════════════════════════════════════════\n"
           );
         }
+
+        // ✅ KHÔNG CẦN tạo record mới vì đã tạo preEmailRecord ở trên
+        return {
+          quality,
+          confidence,
+          ledColor,
+          buzzerTriggered,
+          problematicSensors,
+          emailSent,
+        };
       } else {
         console.log(
           `⏳ [Alert] Cooldown active: ${cooldownStatus.timeLeft}s remaining (prevents spam)`
@@ -334,7 +405,7 @@ async function processSensorData(sensorData) {
       }
     }
 
-    // 5. Lưu vào database
+    // 5. Lưu vào database (CHỈ khi KHÔNG GỬI email hoặc không phải "Kém")
     await AirQuality.create({
       sensorData,
       quality,
