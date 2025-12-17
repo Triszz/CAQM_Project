@@ -28,52 +28,67 @@ async function predictAirQuality(sensorData) {
       throw new Error("Missing required sensor fields");
     }
 
-    // TEST MODE: Force "Kém" để test buzzer + LED + email
-    console.log("TEST MODE: Forcing quality to 'Kém'");
-    return {
-      quality: "Kém",
-      confidence: 0.95,
-      problematicSensors: [
-        {
-          sensor: "CO2",
-          value: co2,
-          unit: "ppm",
-          threshold: 1000,
-          severity: "cao",
-        },
-        {
-          sensor: "PM2.5",
-          value: pm25,
-          unit: "μg/m³",
-          threshold: 35,
-          severity: "cao",
-        },
-      ],
-    };
+    // Test kem
+    // const response = await fetch(
+    //   process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
+    //   {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({
+    //       co2: 1500,
+    //       co: 15,
+    //       pm25: 50,
+    //       temperature: 40,
+    //       humidity: 30,
+    //     }),
+    //   }
+    // );
+
+    // Test trung binh
+    // const response = await fetch(
+    //   process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
+    //   {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({
+    //       co2: 900,
+    //       co: 7,
+    //       pm25: 30,
+    //       temperature: 33,
+    //       humidity: 90,
+    //     }),
+    //   }
+    // );
+
     // Gọi Python Decision Tree API
-    // const response = await fetch(process.env.AI_SERVICE_URL || "http://localhost:5000/predict", {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify({
-    //     co2,
-    //     co,
-    //     pm25,
-    //     temperature,
-    //     humidity,
-    //   }),
-    // });
+    const response = await fetch(
+      process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          co2,
+          co,
+          pm25,
+          temperature,
+          humidity,
+        }),
+      }
+    );
 
-    // if (!response.ok) {
-    //   throw new Error(`AI Service error: ${response.status} ${response.statusText}`);
-    // }
+    if (!response.ok) {
+      throw new Error(
+        `AI Service error: ${response.status} ${response.statusText}`
+      );
+    }
 
-    // const result = await response.json();
+    const result = await response.json();
 
-    // return {
-    //   quality: result.quality,
-    //   confidence: result.confidence,
-    //   problematicSensors: result.problematic_sensors || [],
-    // };
+    return {
+      quality: result.quality,
+      confidence: result.confidence,
+      problematicSensors: result.problematic_sensors || [],
+    };
   } catch (error) {
     console.error("AI prediction error:", error);
     throw error;
@@ -98,11 +113,15 @@ async function processSensorData(sensorData) {
     const mqttClient = getMqttClient();
 
     // 1. AI prediction
-    const { quality, confidence, problematicSensors } = await predictAirQuality(sensorData);
+    const { quality, confidence, problematicSensors } = await predictAirQuality(
+      sensorData
+    );
 
     console.log(
       `AI: ${quality} (confidence: ${confidence}) - Problematic sensors: ${
-        problematicSensors.length > 0 ? problematicSensors.map((s) => s.sensor).join(", ") : "None"
+        problematicSensors.length > 0
+          ? problematicSensors.map((s) => s.sensor).join(", ")
+          : "None"
       }`
     );
 
@@ -184,13 +203,18 @@ async function processSensorData(sensorData) {
 
           await new Promise((resolve) => setTimeout(resolve, 500));
 
-          mqttClient.publish(MQTT_TOPICS.DEVICE_CONTROL, JSON.stringify(buzzerPayload), { qos: 1 }, (err) => {
-            if (err) {
-              console.error("MQTT publish error:", err);
-            } else {
-              console.log("Buzzer alert published successfully!");
+          mqttClient.publish(
+            MQTT_TOPICS.DEVICE_CONTROL,
+            JSON.stringify(buzzerPayload),
+            { qos: 1 },
+            (err) => {
+              if (err) {
+                console.error("MQTT publish error:", err);
+              } else {
+                console.log("Buzzer alert published successfully!");
+              }
             }
-          });
+          );
 
           buzzerTriggered = true;
           buzzerConfig = { beepCount, beepDuration, interval };
@@ -229,7 +253,9 @@ async function processSensorData(sensorData) {
       const now = Date.now();
 
       if (now - lastEmailSent >= EMAIL_COOLDOWN) {
-        console.log("\n═══════════════════════════════════════════════════════");
+        console.log(
+          "\n═══════════════════════════════════════════════════════"
+        );
         console.log("📬 EMAIL & PUSHSAFER ALERT BLOCK");
         console.log("═══════════════════════════════════════════════════════");
         console.log("Sending air quality alert email...");
@@ -271,19 +297,30 @@ async function processSensorData(sensorData) {
             emailSent = true;
             console.log("\n✅ Alert email sent to:", userEmail);
           } else {
-            console.error("\n❌ Failed to send alert email:", emailResult.error);
+            console.error(
+              "\n❌ Failed to send alert email:",
+              emailResult.error
+            );
           }
 
-          console.log("═══════════════════════════════════════════════════════\n");
+          console.log(
+            "═══════════════════════════════════════════════════════\n"
+          );
         } catch (emailError) {
           console.error("\n❌ Email/Pushsafer block error:", emailError);
           console.error("   Error type:", emailError.constructor.name);
           console.error("   Stack:", emailError.stack);
-          console.log("═══════════════════════════════════════════════════════\n");
+          console.log(
+            "═══════════════════════════════════════════════════════\n"
+          );
         }
       } else {
-        const timeLeft = Math.ceil((EMAIL_COOLDOWN - (now - lastEmailSent)) / 1000);
-        console.log(`⏳ [Alert] Cooldown active: ${timeLeft}s remaining (prevents spam)`);
+        const timeLeft = Math.ceil(
+          (EMAIL_COOLDOWN - (now - lastEmailSent)) / 1000
+        );
+        console.log(
+          `⏳ [Alert] Cooldown active: ${timeLeft}s remaining (prevents spam)`
+        );
       }
     }
 

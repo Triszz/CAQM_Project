@@ -190,81 +190,325 @@ class SimpleMultiLabelModel:
 
 def generate_training_data():
     """
-    Tạo dữ liệu huấn luyện Hybrid (Lai)
+    Tạo dữ liệu huấn luyện - ĐIỀU CHỈNH CHO KHÍ HẬU TP.HCM
+    - Nhiệt độ: 25-40°C (thay vì 20-60°C)
+    - Độ ẩm: 70-85% (thay vì 40-90%)
+    - PM2.5: Ngưỡng cao hơn (do ô nhiễm thực tế)
+    - THÊM: Cases "Trung bình" chi tiết (individual + combinations)
     """
     np.random.seed(42)
     data = []
     labels_quality = []
     labels_problems = []
 
-    # CASE 1: TỐT
+    # ============================================
+    # CASE 1: TỐT (500 samples)
+    # ============================================
     for _ in range(500):
         co2 = np.random.randint(350, 800)
         co = np.random.uniform(0, 5)
         pm25 = np.random.randint(0, 25)
-        temp = np.random.uniform(20, 28)
-        hum = np.random.uniform(40, 60)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
         data.append([co2, co, pm25, temp, hum])
         labels_quality.append("Tốt")
         labels_problems.append([0, 0, 0, 0, 0])
 
-    # CASE 2: TRUNG BÌNH
-    for _ in range(500):
-        co2 = np.random.randint(800, 1000)
-        co = np.random.uniform(5, 9)
-        pm25 = np.random.randint(25, 35)
-        temp = np.random.choice([np.random.uniform(15, 20), np.random.uniform(28, 32)])
-        hum = np.random.choice([np.random.uniform(30, 40), np.random.uniform(60, 70)])
+    # ============================================
+    # CASE 2: TRUNG BÌNH (1,200 samples)
+    # ============================================
+    
+    # 2a. Tất cả sensors ở mức "Tốt" NHƯNG tổng hợp lại "hơi khó chịu" (200 samples)
+    for _ in range(200):
+        co2 = np.random.randint(750, 850)      # Gần ngưỡng
+        co = np.random.uniform(4, 6)           # Gần ngưỡng
+        pm25 = np.random.randint(20, 30)       # Gần ngưỡng
+        temp = np.random.uniform(29, 31)       # Gần ngưỡng
+        hum = np.random.uniform(68, 87)        # Gần ngưỡng
         data.append([co2, co, pm25, temp, hum])
         labels_quality.append("Trung bình")
         labels_problems.append([0, 0, 0, 0, 0])
 
-    # CASE 3: KÉM - HỖN HỢP
-    # 3a. Chỉ do CO2
-    for _ in range(200):
-        co2 = np.random.randint(1100, 2500)
+    # ============================================
+    # CASE 2B: TRUNG BÌNH - INDIVIDUAL SENSORS (ĐƠN LẺ - 750 samples)
+    # ============================================
+    
+    # 2b1. CHỈ CO2 hơi cao (150 samples)
+    for _ in range(150):
+        co2 = np.random.randint(800, 1000)     # ✅ Moderate range
+        co = np.random.uniform(0, 5)           # Tốt
+        pm25 = np.random.randint(0, 25)        # Tốt
+        temp = np.random.uniform(25, 30)       # Tốt
+        hum = np.random.uniform(70, 85)        # Tốt
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # 2b2. CHỈ CO hơi cao (150 samples)
+    for _ in range(150):
+        co2 = np.random.randint(400, 800)      # Tốt
+        co = np.random.uniform(5, 9)           # ✅ Moderate range
+        pm25 = np.random.randint(0, 25)        # Tốt
+        temp = np.random.uniform(25, 30)       # Tốt
+        hum = np.random.uniform(70, 85)        # Tốt
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # 2b3. CHỈ PM2.5 hơi cao (150 samples)
+    for _ in range(150):
+        co2 = np.random.randint(400, 800)      # Tốt
+        co = np.random.uniform(0, 5)           # Tốt
+        pm25 = np.random.randint(25, 35)       # ✅ Moderate range
+        temp = np.random.uniform(25, 30)       # Tốt
+        hum = np.random.uniform(70, 85)        # Tốt
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # 2b4. CHỈ Nhiệt độ hơi nóng (150 samples)
+    for _ in range(150):
+        co2 = np.random.randint(400, 800)      # Tốt
+        co = np.random.uniform(0, 5)           # Tốt
+        pm25 = np.random.randint(0, 25)        # Tốt
+        temp = np.random.uniform(30, 34)       # ✅ Moderate range (hơi nóng)
+        hum = np.random.uniform(70, 85)        # Tốt
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # 2b5. CHỈ Độ ẩm hơi khó chịu (150 samples)
+    for _ in range(150):
+        co2 = np.random.randint(400, 800)      # Tốt
+        co = np.random.uniform(0, 5)           # Tốt
+        pm25 = np.random.randint(0, 25)        # Tốt
+        temp = np.random.uniform(25, 30)       # Tốt
+        hum = np.random.choice([np.random.uniform(65, 70), np.random.uniform(85, 92)])  # ✅ Moderate (hơi khô / hơi ẩm)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # ============================================
+    # CASE 2C: TRUNG BÌNH - COMBINATIONS (2 sensors - 250 samples)
+    # ============================================
+    
+    # 2c1. CO2 + CO hơi cao (50 samples)
+    for _ in range(50):
+        co2 = np.random.randint(800, 1000)
+        co = np.random.uniform(5, 9)
+        pm25 = np.random.randint(0, 25)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # 2c2. CO2 + PM2.5 hơi cao (50 samples)
+    for _ in range(50):
+        co2 = np.random.randint(800, 1000)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(25, 35)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # 2c3. CO2 + Temp hơi cao (50 samples)
+    for _ in range(50):
+        co2 = np.random.randint(800, 1000)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(0, 25)
+        temp = np.random.uniform(30, 34)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # 2c4. CO + PM2.5 hơi cao (50 samples)
+    for _ in range(50):
+        co2 = np.random.randint(400, 800)
+        co = np.random.uniform(5, 9)
+        pm25 = np.random.randint(25, 35)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # 2c5. PM2.5 + Temp hơi cao (50 samples)
+    for _ in range(50):
+        co2 = np.random.randint(400, 800)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(25, 35)
+        temp = np.random.uniform(30, 34)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Trung bình")
+        labels_problems.append([0, 0, 0, 0, 0])
+
+    # ============================================
+    # CASE 3: KÉM - INDIVIDUAL SENSORS (ĐƠN LẺ - 750 samples)
+    # ============================================
+    
+    # 3a. CHỈ CO2 vượt ngưỡng (150 samples)
+    for _ in range(150):
+        co2 = np.random.randint(1000, 2500)    # ✅ >1000 = Poor
         co = np.random.uniform(0, 5)
         pm25 = np.random.randint(0, 30)
-        temp = np.random.uniform(20, 28)
-        hum = np.random.uniform(40, 60)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
         data.append([co2, co, pm25, temp, hum])
         labels_quality.append("Kém")
         labels_problems.append([1, 0, 0, 0, 0])
 
-    # 3b. Chỉ do PM2.5
-    for _ in range(200):
+    # 3b. CHỈ CO vượt ngưỡng (150 samples)
+    for _ in range(150):
+        co2 = np.random.randint(400, 800)
+        co = np.random.uniform(9, 50)          # ✅ >9 = Poor
+        pm25 = np.random.randint(0, 30)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([0, 1, 0, 0, 0])
+
+    # 3c. CHỈ PM2.5 vượt ngưỡng (150 samples)
+    for _ in range(150):
         co2 = np.random.randint(400, 800)
         co = np.random.uniform(0, 5)
-        pm25 = np.random.randint(40, 150)
-        temp = np.random.uniform(20, 28)
-        hum = np.random.uniform(40, 60)
+        pm25 = np.random.randint(35, 100)      # ✅ >35 = Poor
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
         data.append([co2, co, pm25, temp, hum])
         labels_quality.append("Kém")
         labels_problems.append([0, 0, 1, 0, 0])
 
-    # 3c. Chỉ do Nhiệt độ
-    for _ in range(200):
+    # 3d. CHỈ Nhiệt độ vượt ngưỡng (150 samples)
+    for _ in range(150):
         co2 = np.random.randint(400, 800)
         co = np.random.uniform(0, 5)
         pm25 = np.random.randint(0, 30)
-        temp = np.random.uniform(33, 45)
-        hum = np.random.uniform(40, 60)
+        temp = np.random.uniform(34, 40)       # ✅ >34 = Poor
+        hum = np.random.uniform(70, 85)
         data.append([co2, co, pm25, temp, hum])
         labels_quality.append("Kém")
         labels_problems.append([0, 0, 0, 1, 0])
 
-    # 3d. Hỗn hợp
+    # 3e. CHỈ Độ ẩm vượt ngưỡng (150 samples)
+    for _ in range(150):
+        co2 = np.random.randint(400, 800)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(0, 30)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.choice([np.random.uniform(40, 65), np.random.uniform(92, 100)])  # ✅ <65 hoặc >92 = Poor
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([0, 0, 0, 0, 1])
+
+    # ============================================
+    # CASE 4: KÉM - COMBINATIONS (2 sensors - 500 samples)
+    # ============================================
+    
+    # 4a. CO2 + CO (100 samples)
+    for _ in range(100):
+        co2 = np.random.randint(1000, 2500)
+        co = np.random.uniform(9, 50)
+        pm25 = np.random.randint(0, 30)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([1, 1, 0, 0, 0])
+
+    # 4b. CO2 + PM2.5 (100 samples)
+    for _ in range(100):
+        co2 = np.random.randint(1000, 2500)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(35, 100)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([1, 0, 1, 0, 0])
+
+    # 4c. CO2 + Temp (100 samples)
+    for _ in range(100):
+        co2 = np.random.randint(1000, 2500)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(0, 30)
+        temp = np.random.uniform(34, 40)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([1, 0, 0, 1, 0])
+
+    # 4d. CO + PM2.5 (100 samples)
+    for _ in range(100):
+        co2 = np.random.randint(400, 800)
+        co = np.random.uniform(9, 50)
+        pm25 = np.random.randint(35, 100)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([0, 1, 1, 0, 0])
+
+    # 4e. PM2.5 + Temp (100 samples)
+    for _ in range(100):
+        co2 = np.random.randint(400, 800)
+        co = np.random.uniform(0, 5)
+        pm25 = np.random.randint(35, 100)
+        temp = np.random.uniform(34, 40)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([0, 0, 1, 1, 0])
+
+    # ============================================
+    # CASE 5: KÉM - COMBINATIONS (3 sensors - 200 samples)
+    # ============================================
+    
+    # 5a. CO2 + CO + PM2.5 (100 samples)
+    for _ in range(100):
+        co2 = np.random.randint(1000, 2500)
+        co = np.random.uniform(9, 50)
+        pm25 = np.random.randint(35, 100)
+        temp = np.random.uniform(25, 30)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([1, 1, 1, 0, 0])
+
+    # 5b. CO2 + CO + Temp (100 samples)
+    for _ in range(100):
+        co2 = np.random.randint(1000, 2500)
+        co = np.random.uniform(9, 50)
+        pm25 = np.random.randint(0, 30)
+        temp = np.random.uniform(34, 40)
+        hum = np.random.uniform(70, 85)
+        data.append([co2, co, pm25, temp, hum])
+        labels_quality.append("Kém")
+        labels_problems.append([1, 1, 0, 1, 0])
+        
+    # ============================================
+    # CASE 6: KÉM - ALL SENSORS (4 sensors - 200 samples)
+    # ============================================
+    
+    # 6a. Tất cả sensors vượt ngưỡng nghiêm trọng (200 samples)
     for _ in range(200):
-        co2 = np.random.randint(1200, 3000)
+        co2 = np.random.randint(1500, 3000)
         co = np.random.uniform(15, 50)
-        pm25 = np.random.randint(100, 500)
-        temp = np.random.uniform(35, 60)
-        hum = np.random.uniform(20, 30)
+        pm25 = np.random.randint(75, 200)
+        temp = np.random.uniform(36, 40)
+        hum = np.random.uniform(40, 65)
         data.append([co2, co, pm25, temp, hum])
         labels_quality.append("Kém")
         labels_problems.append([1, 1, 1, 1, 0])
 
     return np.array(data), np.array(labels_quality), np.array(labels_problems)
+
+
 
 # ============================================
 # 2. TRAIN & LOAD CUSTOM MODELS
