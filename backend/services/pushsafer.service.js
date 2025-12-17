@@ -12,7 +12,8 @@ const PUSHSAFER_COOLDOWN = 5 * 60 * 1000; // 5 phút
 
 /**
  * Gửi cảnh báo chất lượng không khí qua Pushsafer
- * @param {Object} sensorData - Dữ liệu cảm biến
+ * CHỈ HIỂN THỊ CÁC SENSORS VƯỢT NGƯỠNG TỪ AI
+ * @param {Object} sensorData - Dữ liệu cảm biến (bao gồm problematicSensors từ AI)
  * @param {String} quality - Chất lượng không khí
  * @param {String} [deviceId] - ID thiết bị Pushsafer (rỗng = tất cả devices trong account)
  * @returns {Object} - { success, sent, message, messageId, etc }
@@ -20,18 +21,38 @@ const PUSHSAFER_COOLDOWN = 5 * 60 * 1000; // 5 phút
 async function sendPushsaferAlert(sensorData, quality, deviceId = "") {
   try {
     const now = Date.now();
-    const { temperature, humidity, co2, co, pm25 } = sensorData;
+    const { problematicSensors = [] } = sensorData;
 
     // ✅ DEBUG: Log input
     console.log("📱 [Pushsafer] Starting sendPushsaferAlert...");
-    console.log("   Device ID:", deviceId || process.env.PUSHSAFER_DEVICE_ID || "all devices");
+    console.log(
+      "   Device ID:",
+      deviceId || process.env.PUSHSAFER_DEVICE_ID || "all devices"
+    );
     console.log("   Quality:", quality);
-    console.log("   Data:", { temperature, humidity, co2, co, pm25 });
+    console.log("   Data:", sensorData);
+
+    // ✅ KIỂM TRA: Nếu không có sensor vượt ngưỡng → không gửi
+    if (problematicSensors.length === 0) {
+      console.log(
+        "⚠️ [Pushsafer] No problematic sensors detected. Skipping notification."
+      );
+      return {
+        success: false,
+        sent: false,
+        skipped: true,
+        message: "No problematic sensors to report",
+      };
+    }
 
     // ✅ Kiểm tra cooldown (giống email)
     if (now - lastPushsaferSent < PUSHSAFER_COOLDOWN) {
-      const timeLeft = Math.ceil((PUSHSAFER_COOLDOWN - (now - lastPushsaferSent)) / 1000);
-      console.log(`⏳ [Pushsafer] Cooldown active: ${timeLeft}s remaining (prevents spam)`);
+      const timeLeft = Math.ceil(
+        (PUSHSAFER_COOLDOWN - (now - lastPushsaferSent)) / 1000
+      );
+      console.log(
+        `⏳ [Pushsafer] Cooldown active: ${timeLeft}s remaining (prevents spam)`
+      );
       return {
         success: false,
         sent: false,
@@ -44,14 +65,34 @@ async function sendPushsaferAlert(sensorData, quality, deviceId = "") {
     // ✅ DEBUG: Log cooldown check passed
     console.log("✅ [Pushsafer] Cooldown check passed - proceeding to send");
 
+    // ✅ SỬA: Icon mapping
+    const sensorIcons = {
+      CO2: "🏭",
+      CO: "☠️",
+      "PM2.5": "💨",
+      "Nhiệt độ": "🌡️",
+      "Độ ẩm": "💧",
+    };
+
+    // ✅ SỬA: Tạo message CHỈ với sensors vượt ngưỡng
+    const problematicText = problematicSensors
+      .map((s) => {
+        const icon = sensorIcons[s.sensor] || "⚠️";
+        const displayValue =
+          typeof s.value === "number" ? s.value.toFixed(1) : s.value;
+        return `${icon} ${s.sensor}: ${displayValue} ${s.unit} ⚠️`;
+      })
+      .join("\n");
+
     const message = `🚨 CẢNH BÁO: Chất lượng không khí ${quality.toUpperCase()}
 
-📊 Dữ liệu cảm biến:
-🌡️ Nhiệt độ: ${temperature.toFixed(1)}°C
-💧 Độ ẩm: ${humidity.toFixed(1)}%
-🏭 CO₂: ${co2} ppm
-☠️ CO: ${co.toFixed(1)} ppm
-💨 PM2.5: ${pm25.toFixed(1)} µg/m³
+⚠️ ${problematicSensors.length} sensor vượt ngưỡng:
+${problematicText}
+
+💡 Khuyến nghị:
+• Mở cửa sổ thông gió
+• Bật máy lọc không khí
+• Đeo khẩu trang khi cần
 
 Thời gian: ${new Date().toLocaleString("vi-VN", {
       timeZone: "Asia/Ho_Chi_Minh",
@@ -59,7 +100,9 @@ Thời gian: ${new Date().toLocaleString("vi-VN", {
 
     const msg = {
       m: message,
-      t: "IAQM - ⚠️ Cảnh báo không khí",
+      t: `⚠️ ${
+        problematicSensors.length
+      } sensor vượt ngưỡng - ${quality.toUpperCase()}`,
       d: deviceId || process.env.PUSHSAFER_DEVICE_ID || "",
       s: "1", // sound
       v: "1", // vibrate
@@ -73,7 +116,11 @@ Thời gian: ${new Date().toLocaleString("vi-VN", {
     console.log("   Priority:", msg.pr);
     console.log("   Sound:", msg.s);
     console.log("   Vibrate:", msg.v);
-    console.log("   Message preview:", message.substring(0, 50) + "...");
+    console.log("   Message preview:", message.substring(0, 100) + "...");
+    console.log(
+      "   Problematic sensors:",
+      problematicSensors.map((s) => `${s.sensor}=${s.value}${s.unit}`)
+    );
 
     return new Promise((resolve) => {
       console.log("🔄 [Pushsafer] Sending via Pushsafer API...");
