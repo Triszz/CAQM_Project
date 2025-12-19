@@ -3,7 +3,7 @@ const mqtt = require("mqtt");
 const MQTT_TOPICS = require("../config/mqtt.config");
 const { getMqttClient } = require("../config/mqtt.client");
 
-// ✅ Cập nhật độ sáng LED (GIỮ MÀU HIỆN TẠI)
+// Cập nhật độ sáng LED (GIỮ MÀU HIỆN TẠI)
 const updateLedBrightness = async (req, res) => {
   try {
     const { brightness } = req.body;
@@ -16,11 +16,11 @@ const updateLedBrightness = async (req, res) => {
       });
     }
 
-    // ✅ Lấy màu hiện tại từ DB
+    // Lấy màu hiện tại từ DB
     const currentState = await DeviceState.findOne({ deviceType: "led" });
     const currentColor = currentState?.ledState?.currentColor || "green";
 
-    // ✅ Cập nhật brightness, giữ nguyên màu
+    // Cập nhật brightness, giữ nguyên màu
     const deviceState = await DeviceState.findOneAndUpdate(
       { deviceType: "led" },
       {
@@ -33,7 +33,7 @@ const updateLedBrightness = async (req, res) => {
       { new: true, upsert: true }
     );
 
-    // ✅ Gửi lệnh qua MQTT (bao gồm CẢ brightness VÀ color)
+    // Gửi lệnh qua MQTT (bao gồm CẢ brightness VÀ color)
     const mqttPayload = {
       device: "led",
       action: "set_brightness",
@@ -42,15 +42,9 @@ const updateLedBrightness = async (req, res) => {
       timestamp: new Date().toISOString(),
     };
     const mqttClient = getMqttClient();
-    mqttClient.publish(
-      MQTT_TOPICS.DEVICE_CONTROL,
-      JSON.stringify(mqttPayload),
-      { qos: 1 }
-    );
+    mqttClient.publish(MQTT_TOPICS.DEVICE_CONTROL, JSON.stringify(mqttPayload), { qos: 1 });
 
-    console.log(
-      `✅ LED brightness updated: ${brightness}% (color: ${currentColor})`
-    );
+    console.log(`LED brightness updated: ${brightness}% (color: ${currentColor})`);
 
     res.status(200).json({
       success: true,
@@ -58,7 +52,7 @@ const updateLedBrightness = async (req, res) => {
       data: deviceState,
     });
   } catch (error) {
-    console.error("❌ Error updating LED brightness:", error);
+    console.error("Error updating LED brightness:", error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -66,7 +60,7 @@ const updateLedBrightness = async (req, res) => {
   }
 };
 
-// ✅ Cập nhật cấu hình Buzzer
+// Cập nhật cấu hình Buzzer
 const updateBuzzerConfig = async (req, res) => {
   try {
     const { beepCount, beepDuration, interval } = req.body;
@@ -79,7 +73,7 @@ const updateBuzzerConfig = async (req, res) => {
       });
     }
 
-    // ✅ Cập nhật database
+    // Cập nhật database
     const deviceState = await DeviceState.findOneAndUpdate(
       { deviceType: "buzzer" },
       {
@@ -93,7 +87,7 @@ const updateBuzzerConfig = async (req, res) => {
       { new: true, upsert: true }
     );
 
-    console.log(`✅ Buzzer config saved: ${beepCount} beeps`);
+    console.log(`Buzzer config saved: ${beepCount} beeps`);
 
     res.status(200).json({
       success: true,
@@ -101,7 +95,7 @@ const updateBuzzerConfig = async (req, res) => {
       data: deviceState,
     });
   } catch (error) {
-    console.error("❌ Error updating buzzer config:", error);
+    console.error("Error updating buzzer config:", error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -109,12 +103,12 @@ const updateBuzzerConfig = async (req, res) => {
   }
 };
 
-// ✅ Test buzzer với config từ frontend (không lưu vào DB)
+// Test buzzer với config từ frontend (không lưu vào DB)
 const testBuzzer = async (req, res) => {
   try {
-    // ✅ Lấy config từ request body (từ frontend)
+    // Lấy config từ request body (từ frontend)
     const { beepCount, beepDuration, interval } = req.body;
-    console.log("📥 Request body:", req.body);
+    console.log("Request body:", req.body);
     // Validate beepCount
     if (!beepCount || beepCount < 1 || beepCount > 10) {
       return res.status(400).json({
@@ -123,7 +117,7 @@ const testBuzzer = async (req, res) => {
       });
     }
 
-    // ✅ Gửi lệnh test qua MQTT với config từ user
+    // Gửi lệnh test qua MQTT với config từ user
     const mqttPayload = {
       device: "buzzer",
       action: "test",
@@ -135,20 +129,14 @@ const testBuzzer = async (req, res) => {
       timestamp: new Date().toISOString(),
     };
 
-    console.log("📤 MQTT Payload (Test Buzzer):");
+    console.log("MQTT Payload (Test Buzzer):");
     console.log(JSON.stringify(mqttPayload, null, 2));
     const mqttClient = getMqttClient();
-    mqttClient.publish(
-      MQTT_TOPICS.DEVICE_CONTROL,
-      JSON.stringify(mqttPayload),
-      {
-        qos: 1,
-      }
-    );
+    mqttClient.publish(MQTT_TOPICS.DEVICE_CONTROL, JSON.stringify(mqttPayload), {
+      qos: 1,
+    });
 
-    console.log(
-      `✅ Buzzer test triggered: ${beepCount} beeps (not saved to DB)`
-    );
+    console.log(`Buzzer test triggered: ${beepCount} beeps (not saved to DB)`);
 
     res.status(200).json({
       success: true,
@@ -156,7 +144,7 @@ const testBuzzer = async (req, res) => {
       config: mqttPayload.config,
     });
   } catch (error) {
-    console.error("❌ Error testing buzzer:", error);
+    console.error("Error testing buzzer:", error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -164,7 +152,7 @@ const testBuzzer = async (req, res) => {
   }
 };
 
-// ✅ Lấy trạng thái hiện tại của device
+// Lấy trạng thái hiện tại của device
 const getDeviceState = async (req, res) => {
   try {
     const { deviceType } = req.params;
@@ -190,7 +178,7 @@ const getDeviceState = async (req, res) => {
   }
 };
 
-// ✅ Lấy tất cả trạng thái devices
+// Lấy tất cả trạng thái devices
 const getAllDeviceStates = async (req, res) => {
   try {
     const deviceStates = await DeviceState.find();

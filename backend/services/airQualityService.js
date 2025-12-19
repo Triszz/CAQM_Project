@@ -4,11 +4,11 @@ const AirQuality = require("../models/airQuality.model");
 const DeviceState = require("../models/deviceState.model");
 const mqtt = require("mqtt");
 const MQTT_TOPICS = require("../config/mqtt.config");
-const { sendAirQualityAlert } = require("./emailService"); // ✅ ĐÃ CÓ
+const { sendAirQualityAlert } = require("./emailService");
 const { getMqttClient, isMqttConnected } = require("../config/mqtt.client");
 const { sendPushsaferAlert } = require("./pushsafer.service");
 
-// ✅ THÊM: Biến lưu trạng thái email (tránh spam)
+// THEM: Biến lưu trạng thái email (tránh spam)
 const EMAIL_COOLDOWN = 5 * 60 * 1000; // 5 phút
 
 // Hàm gọi AI
@@ -27,58 +27,21 @@ async function predictAirQuality(sensorData) {
       throw new Error("Missing required sensor fields");
     }
 
-    // Test kem
-    // const response = await fetch(
-    //   process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
-    //   {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify({
-    //       co2: 1500,
-    //       co: 15,
-    //       pm25: 50,
-    //       temperature: 40,
-    //       humidity: 95,
-    //     }),
-    //   }
-    // );
-
-    // Test trung binh
-    // const response = await fetch(
-    //   process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
-    //   {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify({
-    //       co2: 900,
-    //       co: 7,
-    //       pm25: 30,
-    //       temperature: 33,
-    //       humidity: 90,
-    //     }),
-    //   }
-    // );
-
     // Gọi Python Decision Tree API
-    const response = await fetch(
-      process.env.AI_SERVICE_URL || "http://localhost:5000/predict",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          co2,
-          co,
-          pm25,
-          temperature,
-          humidity,
-        }),
-      }
-    );
+    const response = await fetch(process.env.AI_SERVICE_URL || "http://localhost:5000/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        co2,
+        co,
+        pm25,
+        temperature,
+        humidity,
+      }),
+    });
 
     if (!response.ok) {
-      throw new Error(
-        `AI Service error: ${response.status} ${response.statusText}`
-      );
+      throw new Error(`AI Service error: ${response.status} ${response.statusText}`);
     }
 
     const result = await response.json();
@@ -94,7 +57,7 @@ async function predictAirQuality(sensorData) {
   }
 }
 
-// Map chất lượng → màu LED
+// Map chất lượng -> màu LED
 function getColorForQuality(quality) {
   const colorMap = {
     Tốt: "green",
@@ -109,78 +72,41 @@ async function canSendEmailNow() {
     const now = new Date();
     const cooldownTime = new Date(now.getTime() - EMAIL_COOLDOWN);
 
-    // ✅ Tìm email cuối cùng GỬI TRONG 5 PHÚT QUA
+    // Tìm email cuối cùng GỬI TRONG 5 PHÚT QUA
     const recentAlert = await AirQuality.findOne({
       emailSent: true,
       timestamp: { $gte: cooldownTime }, // Trong 5 phút qua
     }).sort({ timestamp: -1 });
 
     if (recentAlert) {
-      const timeLeft = Math.ceil(
-        (EMAIL_COOLDOWN -
-          (now.getTime() - new Date(recentAlert.timestamp).getTime())) /
-          1000
-      );
+      const timeLeft = Math.ceil((EMAIL_COOLDOWN - (now.getTime() - new Date(recentAlert.timestamp).getTime())) / 1000);
       console.log(
-        `⏳ [Email Cooldown] Last email sent ${Math.floor(
+        `[Email Cooldown] Last email sent ${Math.floor(
           (now.getTime() - new Date(recentAlert.timestamp).getTime()) / 1000
         )}s ago. Cooldown: ${timeLeft}s remaining.`
       );
       return { canSend: false, timeLeft };
     }
 
-    console.log("✅ [Email Cooldown] No recent emails found. Can send.");
+    console.log("[Email Cooldown] No recent emails found. Can send.");
     return { canSend: true, timeLeft: 0 };
   } catch (error) {
-    console.error("❌ Error checking email cooldown:", error);
-    return { canSend: false, timeLeft: 300 }; // ✅ THAY ĐỔI: Mặc định KHÔNG cho phép gửi nếu lỗi
+    console.error("Error checking email cooldown:", error);
+    return { canSend: false, timeLeft: 300 }; // THAY DOI: Mặc định KHÔNG cho phép gửi nếu lỗi
   }
 }
 
-// async function checkEmailCooldown() {
-//   try {
-//     // Lấy lần email cuối từ DB
-//     const lastAlert = await AirQuality.findOne({ emailSent: true })
-//       .sort({ timestamp: -1 })
-//       .select("timestamp");
-
-//     if (!lastAlert) {
-//       return { canSend: true, timeLeft: 0 }; // Chưa từng gửi email
-//     }
-
-//     const now = Date.now();
-//     const lastSentTime = new Date(lastAlert.timestamp).getTime();
-//     const timeSinceLastEmail = now - lastSentTime;
-
-//     if (timeSinceLastEmail >= EMAIL_COOLDOWN) {
-//       return { canSend: true, timeLeft: 0 };
-//     } else {
-//       const timeLeft = Math.ceil((EMAIL_COOLDOWN - timeSinceLastEmail) / 1000);
-//       return { canSend: false, timeLeft };
-//     }
-//   } catch (error) {
-//     console.error("Error checking email cooldown:", error);
-//     return { canSend: true, timeLeft: 0 }; // Mặc định cho phép gửi nếu lỗi
-//   }
-// }
-
 // Xử lý sensor data: AI + LED + Buzzer + EMAIL
-// services/airQualityService.js
-
 async function processSensorData(sensorData) {
   try {
     const mqttClient = getMqttClient();
 
     // 1. AI prediction
-    const { quality, confidence, problematicSensors } = await predictAirQuality(
-      sensorData
-    );
+    const { quality, confidence, problematicSensors } = await predictAirQuality(sensorData);
 
     console.log(
       `AI: ${quality} (confidence: ${confidence}) - Problematic sensors: ${
-        problematicSensors.length > 0
-          ? problematicSensors.map((s) => s.sensor).join(", ")
-          : "None"
+        problematicSensors.length > 0 ? problematicSensors.map((s) => s.sensor).join(", ") : "None"
       }`
     );
 
@@ -255,18 +181,13 @@ async function processSensorData(sensorData) {
 
           await new Promise((resolve) => setTimeout(resolve, 500));
 
-          mqttClient.publish(
-            MQTT_TOPICS.DEVICE_CONTROL,
-            JSON.stringify(buzzerPayload),
-            { qos: 1 },
-            (err) => {
-              if (err) {
-                console.error("MQTT publish error:", err);
-              } else {
-                console.log("Buzzer alert published successfully!");
-              }
+          mqttClient.publish(MQTT_TOPICS.DEVICE_CONTROL, JSON.stringify(buzzerPayload), { qos: 1 }, (err) => {
+            if (err) {
+              console.error("MQTT publish error:", err);
+            } else {
+              console.log("Buzzer alert published successfully!");
             }
-          );
+          });
 
           buzzerTriggered = true;
           buzzerConfig = { beepCount, beepDuration, interval };
@@ -295,17 +216,15 @@ async function processSensorData(sensorData) {
 
       console.log("===============================================\n");
 
-      // 3.2 EMAIL - ✅ SỬA: Kiểm tra cooldown TRƯỚC KHI gửi
+      // 3.2 EMAIL - SUA: Kiểm tra cooldown TRƯỚC KHI gửi
       const cooldownStatus = await canSendEmailNow();
 
       if (cooldownStatus.canSend) {
-        console.log(
-          "\n═══════════════════════════════════════════════════════"
-        );
-        console.log("📬 EMAIL & PUSHSAFER ALERT BLOCK");
+        console.log("\n═══════════════════════════════════════════════════════");
+        console.log("EMAIL & PUSHSAFER ALERT BLOCK");
         console.log("═══════════════════════════════════════════════════════");
 
-        // ✅ THÊM: LƯU VÀO DB TRƯỚC KHI GỬI EMAIL (để block các requests tiếp theo)
+        // THEM: LƯU VÀO DB TRƯỚC KHI GỬI EMAIL (để block các requests tiếp theo)
         const preEmailRecord = await AirQuality.create({
           sensorData,
           quality,
@@ -314,15 +233,11 @@ async function processSensorData(sensorData) {
           buzzerTriggered,
           buzzerConfig,
           problematicSensors,
-          emailSent: false, // ← Chưa gửi, nhưng đã reserve slot
+          emailSent: false, // <- Chưa gửi, nhưng đã reserve slot
           timestamp: new Date(),
         });
 
-        console.log(
-          "📝 Pre-email record created (ID:",
-          preEmailRecord._id,
-          ")"
-        );
+        console.log("Pre-email record created (ID:", preEmailRecord._id, ")");
 
         try {
           const userEmail = process.env.ALERT_EMAIL || process.env.EMAIL_USER;
@@ -345,17 +260,17 @@ async function processSensorData(sensorData) {
           console.log("Success:", emailResult.success);
           console.log("Message ID:", emailResult.messageId || "N/A");
 
-          // ✅ UPDATE: Cập nhật record sau khi gửi email
+          // UPDATE: Cập nhật record sau khi gửi email
           if (emailResult.success) {
             await AirQuality.findByIdAndUpdate(preEmailRecord._id, {
-              emailSent: true, // ← Gửi thành công
+              emailSent: true, // <- Gửi thành công
             });
             emailSent = true;
-            console.log("\n✅ Alert email sent to:", userEmail);
+            console.log("\nAlert email sent to:", userEmail);
           } else {
-            // ✅ Nếu gửi thất bại, xóa record để không block lần sau
+            // Nếu gửi thất bại, xóa record để không block lần sau
             await AirQuality.findByIdAndDelete(preEmailRecord._id);
-            console.error("\n❌ Failed to send email. Record deleted.");
+            console.error("\nFailed to send email. Record deleted.");
           }
 
           console.log("\n--- 4.2 PUSHSAFER ATTEMPT ---");
@@ -374,22 +289,18 @@ async function processSensorData(sensorData) {
           console.log("Sent:", pushsaferResult.sent);
           console.log("Message:", pushsaferResult.message);
 
-          console.log(
-            "═══════════════════════════════════════════════════════\n"
-          );
+          console.log("═══════════════════════════════════════════════════════\n");
         } catch (emailError) {
-          console.error("\n❌ Email/Pushsafer block error:", emailError);
+          console.error("\nEmail/Pushsafer block error:", emailError);
 
-          // ✅ Nếu có lỗi, xóa record để không block lần sau
+          // Nếu có lỗi, xóa record để không block lần sau
           await AirQuality.findByIdAndDelete(preEmailRecord._id);
           console.log("   Pre-email record deleted due to error.");
 
-          console.log(
-            "═══════════════════════════════════════════════════════\n"
-          );
+          console.log("═══════════════════════════════════════════════════════\n");
         }
 
-        // ✅ KHÔNG CẦN tạo record mới vì đã tạo preEmailRecord ở trên
+        // KHONG CAN tạo record mới vì đã tạo preEmailRecord ở trên
         return {
           quality,
           confidence,
@@ -399,9 +310,7 @@ async function processSensorData(sensorData) {
           emailSent,
         };
       } else {
-        console.log(
-          `⏳ [Alert] Cooldown active: ${cooldownStatus.timeLeft}s remaining (prevents spam)`
-        );
+        console.log(`[Alert] Cooldown active: ${cooldownStatus.timeLeft}s remaining (prevents spam)`);
       }
     }
 

@@ -1,10 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-// ✅ THÊM: Import và khởi tạo MQTT client
+// THEM: Import và khởi tạo MQTT client
 const { initMqttClient } = require("./config/mqtt.client");
 
-// ✅ THÊM: Khởi tạo MQTT client NGAY ĐẦU
+// THEM: Khởi tạo MQTT client NGAY ĐẦU
 initMqttClient();
 
 const mongoose = require("mongoose");
@@ -22,7 +22,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// ✅ Khởi động MQTT subscriber
+// Khởi động MQTT subscriber
 const mqttSubscriber = require("./mqtt/subscriber");
 
 // routes
@@ -39,8 +39,8 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log("Connect to database successfully!");
-    console.log("🤖 AI Air Quality Service: READY");
-    console.log("📡 MQTT Subscriber: ACTIVE");
+    console.log("AI Air Quality Service: READY");
+    console.log("MQTT Subscriber: ACTIVE");
     app.listen(PORT, () => {
       console.log(`Server is listening on PORT ${PORT}.`);
     });

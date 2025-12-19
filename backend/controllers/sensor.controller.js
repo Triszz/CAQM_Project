@@ -16,16 +16,14 @@ const addSensorReading = async (req, res) => {
       co === undefined ||
       pm25 === undefined
     ) {
-      return res
-        .status(400)
-        .json({ error: "All sensor fields must be filled!" });
+      return res.status(400).json({ error: "All sensor fields must be filled!" });
     }
     // Tạo bản ghi mới trong MongoDB
     // Mongoose schema sẽ validate:
-    // - temperature phải ≥ -50 và ≤ 100
-    // - humidity phải ≥ 0 và ≤ 100
-    // - co2, co, pm25 phải ≥ 0
-    // Nếu không hợp lệ → throw error
+    // - temperature phải >= -50 và <= 100
+    // - humidity phải >= 0 và <= 100
+    // - co2, co, pm25 phải >= 0
+    // Nếu không hợp lệ -> throw error
     const sensorReading = await Sensor.create({
       timestamp,
       temperature,
@@ -44,9 +42,7 @@ const addSensorReading = async (req, res) => {
 
 const getLatestSensorReading = async (req, res) => {
   try {
-    const latestReading = await Sensor.findOne()
-      .sort({ timestamp: -1 })
-      .limit(1);
+    const latestReading = await Sensor.findOne().sort({ timestamp: -1 }).limit(1);
 
     if (!latestReading) {
       return res.status(404).json({
@@ -55,7 +51,7 @@ const getLatestSensorReading = async (req, res) => {
       });
     }
 
-    // ✅ SỬA: Wrap trong { success: true, data: ... }
+    // SUA: Wrap trong { success: true, data: ... }
     res.status(200).json({
       success: true,
       data: latestReading,
@@ -93,29 +89,25 @@ const getSensorReadingByRange = async (req, res) => {
 
     // Validate: từ và đến phải có cả 2
     if (!from || !to) {
-      return res
-        .status(400)
-        .json({ error: "From and to timestamps must be provided!" });
+      return res.status(400).json({ error: "From and to timestamps must be provided!" });
     }
 
     // Chuyển string milliseconds thành Date objects
-    // parseInt: "1731535800000" → 1731535800000 (number)
-    // new Date(milliseconds): milliseconds → Date object
+    // parseInt: "1731535800000" -> 1731535800000 (number)
+    // new Date(milliseconds): milliseconds -> Date object
     const fromDate = new Date(parseInt(from));
     const toDate = new Date(parseInt(to));
 
     // Truy vấn: tìm tất cả documents có timestamp trong [fromDate, toDate]
     // $gte: >=, $lte: <=
-    // sort({ timestamp: 1 }): tăng dần = cũ → mới (phù hợp vẽ chart)
+    // sort({ timestamp: 1 }): tăng dần = cũ -> mới (phù hợp vẽ chart)
     const readings = await Sensor.find({
       timestamp: { $gte: fromDate, $lte: toDate },
     }).sort({ timestamp: 1 });
 
     // Kiểm tra có dữ liệu không
     if (readings.length === 0) {
-      return res
-        .status(404)
-        .json({ error: "No sensor readings found in this range!" });
+      return res.status(404).json({ error: "No sensor readings found in this range!" });
     }
 
     // Trả mảng documents
@@ -131,13 +123,11 @@ const deleteOldReadings = async (req, res) => {
 
     // Validate: days phải có giá trị
     if (!days) {
-      return res
-        .status(400)
-        .json({ error: "Days parameter must be provided!" });
+      return res.status(400).json({ error: "Days parameter must be provided!" });
     }
 
     // Tính ngày cutoff
-    // Ví dụ: hôm nay là 14/11, days=30 → cutoff = 15/10
+    // Ví dụ: hôm nay là 14/11, days=30 -> cutoff = 15/10
     // Xóa tất cả data < 15/10 (cũ hơn 30 ngày)
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - parseInt(days));
@@ -195,21 +185,21 @@ const getSensorReadingLastHour = async (req, res) => {
     });
   }
 };
-// ✅ THÊM: Lấy giá trị trung bình tất cả cảm biến
+// THEM: Lấy giá trị trung bình tất cả cảm biến
 const getSensorAverages = async (req, res) => {
   try {
-    // ✅ THÊM: Lấy hours từ query params
+    // THEM: Lấy hours từ query params
     const hours = req.query.hours ? parseInt(req.query.hours) : null;
 
-    console.log("📊 Calculating sensor averages...");
+    console.log("Calculating sensor averages...");
     if (hours) {
-      console.log(`🕒 Filtering data from last ${hours} hours`);
+      console.log(`Filtering data from last ${hours} hours`);
     }
 
-    // ✅ THÊM: Build aggregation pipeline với optional time filter
+    // THEM: Build aggregation pipeline với optional time filter
     const pipeline = [];
 
-    // ✅ THÊM: Match stage nếu có hours
+    // THEM: Match stage nếu có hours
     if (hours) {
       const timeLimit = new Date(Date.now() - hours * 60 * 60 * 1000);
       pipeline.push({
@@ -219,7 +209,7 @@ const getSensorAverages = async (req, res) => {
       });
     }
 
-    // ✅ Group stage
+    // Group stage
     pipeline.push({
       $group: {
         _id: null,
@@ -229,15 +219,15 @@ const getSensorAverages = async (req, res) => {
         avgCO: { $avg: "$co" },
         avgPM25: { $avg: "$pm25" },
         totalRecords: { $sum: 1 },
-        oldestRecord: { $min: "$timestamp" }, // ✅ THÊM
-        newestRecord: { $max: "$timestamp" }, // ✅ THÊM
+        oldestRecord: { $min: "$timestamp" }, // THEM
+        newestRecord: { $max: "$timestamp" }, // THEM
       },
     });
 
-    // ✅ Execute aggregation
+    // Execute aggregation
     const averages = await Sensor.aggregate(pipeline);
 
-    // ✅ Kiểm tra có data không
+    // Kiểm tra có data không
     if (!averages || averages.length === 0) {
       return res.status(404).json({
         success: false,
@@ -255,7 +245,7 @@ const getSensorAverages = async (req, res) => {
 
     const result = averages[0];
 
-    // ✅ Format kết quả
+    // Format kết quả
     const formattedResult = {
       temperature: parseFloat(result.avgTemperature?.toFixed(2) || 0),
       humidity: parseFloat(result.avgHumidity?.toFixed(2) || 0),
@@ -264,23 +254,21 @@ const getSensorAverages = async (req, res) => {
       pm25: parseFloat(result.avgPM25?.toFixed(2) || 0),
       totalRecords: result.totalRecords || 0,
       timeRange: {
-        // ✅ THÊM
+        // THEM
         from: result.oldestRecord || null,
         to: result.newestRecord || null,
       },
     };
 
-    console.log("✅ Sensor averages calculated:", formattedResult);
+    console.log("Sensor averages calculated:", formattedResult);
 
     res.status(200).json({
       success: true,
-      message: hours
-        ? `Sensor averages for last ${hours} hours`
-        : "Sensor averages for all data",
+      message: hours ? `Sensor averages for last ${hours} hours` : "Sensor averages for all data",
       data: formattedResult,
     });
   } catch (error) {
-    console.error("❌ Error calculating sensor averages:", error);
+    console.error("Error calculating sensor averages:", error);
     res.status(500).json({
       success: false,
       message: "Failed to calculate sensor averages",

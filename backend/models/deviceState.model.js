@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const DeviceStateSchema = new mongoose.Schema(
   {
-    // ✅ Loại thiết bị
+    // Loại thiết bị
     deviceType: {
       type: String,
       required: true,
@@ -10,13 +10,13 @@ const DeviceStateSchema = new mongoose.Schema(
       unique: true, // Mỗi loại device chỉ có 1 document (trạng thái hiện tại)
     },
 
-    // ✅ Trạng thái bật/tắt
+    // Trạng thái bật/tắt
     isActive: {
       type: Boolean,
       default: false,
     },
 
-    // ✅ Trạng thái LED
+    // Trạng thái LED
     ledState: {
       brightness: {
         type: Number,
@@ -31,7 +31,7 @@ const DeviceStateSchema = new mongoose.Schema(
       },
     },
 
-    // ✅ Trạng thái Buzzer
+    // Trạng thái Buzzer
     buzzerState: {
       beepCount: {
         type: Number,

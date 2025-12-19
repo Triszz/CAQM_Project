@@ -7,15 +7,15 @@ function Gauge({
   minValue = 0,
   maxValue = 100,
   unit = "",
-  thresholds = [0.33, 0.67, 1], // ← Mặc định 33%, 67%, 100%
-  customThresholds = null, // ← ✅ THÊM: Ngưỡng tuyệt đối (không phải %)
+  thresholds = [0.33, 0.67, 1], // Mặc định 33%, 67%, 100%
+  customThresholds = null, // Ngưỡng tuyệt đối (không phải %)
   humidityMode = false,
 }) {
-  // ✅ SỬA: Tính percent dựa trên customThresholds hoặc thresholds
+  // Tính percent dựa trên customThresholds hoặc thresholds
   let colorCategory = "green"; // "green", "yellow", "red"
 
   if (humidityMode) {
-    // ✅ Logic đặc biệt cho độ ẩm (2 khoảng)
+    // Logic đặc biệt cho độ ẩm (2 khoảng)
     if (value >= 70 && value <= 85) {
       colorCategory = "green"; // Tốt: 70-85%
     } else if ((value >= 65 && value < 70) || (value > 85 && value <= 92)) {
@@ -24,7 +24,7 @@ function Gauge({
       colorCategory = "red"; // Kém: <65% hoặc >92%
     }
   } else if (customThresholds) {
-    // ✅ Logic thông thường
+    // Logic thông thường
     const [goodMax, moderateMax] = customThresholds;
 
     if (value <= goodMax) {
@@ -35,11 +35,8 @@ function Gauge({
       colorCategory = "red";
     }
   } else {
-    // ✅ Dùng ngưỡng % (code cũ)
-    const percent = Math.max(
-      0,
-      Math.min(1, (value - minValue) / (maxValue - minValue))
-    );
+    // Dùng ngưỡng % (code cũ)
+    const percent = Math.max(0, Math.min(1, (value - minValue) / (maxValue - minValue)));
 
     if (percent < thresholds[0]) {
       colorCategory = "green";
@@ -59,11 +56,8 @@ function Gauge({
     return colors[colorCategory];
   };
 
-  // ✅ Tính percent cho hiển thị gauge (luôn dựa trên minValue/maxValue)
-  const displayPercent = Math.max(
-    0,
-    Math.min(1, (value - minValue) / (maxValue - minValue))
-  );
+  // Tính percent cho hiển thị gauge (luôn dựa trên minValue/maxValue)
+  const displayPercent = Math.max(0, Math.min(1, (value - minValue) / (maxValue - minValue)));
 
   const data = [
     { name: "value", value: displayPercent * 100 },

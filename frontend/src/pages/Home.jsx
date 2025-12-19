@@ -17,20 +17,20 @@ function Home({ chatMessages, setChatMessages }) {
 
   const [realtimeData, setRealtimeData] = useState([]);
   const maxRealtimePoints = 1200;
-  // ✅ useEffect 1: Load và update Air Quality mỗi 3 giây
+  //useEffect 1: Load và update Air Quality mỗi 3 giây
   useEffect(() => {
     if (!user?.token) return;
 
     const loadAirQuality = async () => {
       try {
-        console.log("🤖 Loading air quality...");
+        console.log("Loading air quality...");
         const response = await AirQualityAPI.getCurrentAirQuality();
         const airQuality = response.data.data.quality;
 
         setQuality(airQuality);
-        console.log(`✅ Air Quality: ${airQuality}`);
+        console.log(`Air Quality: ${airQuality}`);
       } catch (error) {
-        console.error("❌ Failed to load air quality:", error);
+        console.error("Failed to load air quality:", error);
         // Nếu chưa có dữ liệu, giữ giá trị mặc định
         if (error.response?.status === 404) {
           setQuality("Tốt"); // Default
@@ -43,15 +43,15 @@ function Home({ chatMessages, setChatMessages }) {
     const airQualityInterval = setInterval(loadAirQuality, 3000);
 
     return () => clearInterval(airQualityInterval);
-  }, [user?.token]); // ✅ CHỈ phụ thuộc vào user.token
+  }, [user?.token]); // CHỈ phụ thuộc vào user.token
 
-  // ✅ useEffect 2: Load dữ liệu 1 giờ ban đầu
+  // useEffect 2: Load dữ liệu 1 giờ ban đầu
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user?.token) return;
 
       try {
-        console.log("📥 Loading last hour data...");
+        console.log("Loading last hour data...");
         const response = await SensorAPI.getSensorReadingLastHour();
         const result = response.data;
 
@@ -70,7 +70,7 @@ function Home({ chatMessages, setChatMessages }) {
             co: item.co,
           }));
 
-          console.log(`✅ Loaded ${formattedData.length} historical points`);
+          console.log(`Loaded ${formattedData.length} historical points`);
           setRealtimeData(formattedData.slice(-maxRealtimePoints));
 
           // Cập nhật gauge với điểm mới nhất
@@ -81,17 +81,17 @@ function Home({ chatMessages, setChatMessages }) {
           setCo(latest.co);
           setPm25(latest.pm25);
         } else {
-          console.log("⚠️ No data available in last hour");
+          console.log("No data available in last hour");
         }
       } catch (error) {
-        console.error("❌ Failed to load initial data:", error);
+        console.error("Failed to load initial data:", error);
       }
     };
 
     loadInitialData();
   }, [user?.token, maxRealtimePoints]);
 
-  // ✅ useEffect 3: Cập nhật CẢ GAUGE VÀ CHART mỗi 3 giây
+  // useEffect 3: Cập nhật CẢ GAUGE VÀ CHART mỗi 3 giây
   useEffect(() => {
     if (!user?.token) return;
 
@@ -130,9 +130,7 @@ function Home({ chatMessages, setChatMessages }) {
           return updated;
         });
 
-        console.log(
-          `🔄 [${new Date().toLocaleTimeString()}] Gauges & Chart updated`
-        );
+        console.log(`🔄 [${new Date().toLocaleTimeString()}] Gauges & Chart updated`);
       } catch (error) {
         console.error("❌ Failed to update sensor data:", error);
       }
@@ -184,15 +182,7 @@ function Home({ chatMessages, setChatMessages }) {
           unit="ppm"
           customThresholds={[800, 1000]}
         />
-        <Gauge
-          id="co-gauge"
-          title="CO"
-          value={co}
-          minValue={0}
-          maxValue={50}
-          unit="ppm"
-          customThresholds={[5, 9]}
-        />
+        <Gauge id="co-gauge" title="CO" value={co} minValue={0} maxValue={50} unit="ppm" customThresholds={[5, 9]} />
         <Gauge
           id="temp-gauge"
           title="Nhiệt độ"
@@ -226,20 +216,12 @@ function Home({ chatMessages, setChatMessages }) {
       </div>
 
       {!showChatbot && (
-        <button
-          className="chatbot-toggle-button"
-          onClick={() => setShowChatbot(true)}
-          title="Mở AI Assistant"
-        >
+        <button className="chatbot-toggle-button" onClick={() => setShowChatbot(true)} title="Mở AI Assistant">
           💬
         </button>
       )}
       {showChatbot && (
-        <ChatBot
-          onClose={() => setShowChatbot(false)}
-          messages={chatMessages}
-          setMessages={setChatMessages}
-        />
+        <ChatBot onClose={() => setShowChatbot(false)} messages={chatMessages} setMessages={setChatMessages} />
       )}
     </div>
   );

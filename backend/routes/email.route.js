@@ -5,7 +5,7 @@ const router = express.Router();
 const { sendAirQualityAlert } = require("../services/emailService");
 const requireAuth = require("../middlewares/requireAuth");
 
-// ✅ Test endpoint gửi email
+//Test endpoint gửi email
 router.post("/test-alert", requireAuth, async (req, res) => {
   try {
     const { email } = req.body;
@@ -20,11 +20,7 @@ router.post("/test-alert", requireAuth, async (req, res) => {
       quality: "TỆ",
     };
 
-    const result = await sendAirQualityAlert(
-      email || process.env.ALERT_EMAIL,
-      req.user.username,
-      mockData
-    );
+    const result = await sendAirQualityAlert(email || process.env.ALERT_EMAIL, req.user.username, mockData);
 
     if (result.success) {
       res.status(200).json({

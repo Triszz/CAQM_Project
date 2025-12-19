@@ -10,19 +10,19 @@ const {
 const requireAuth = require("../middlewares/requireAuth");
 
 router.use(requireAuth);
-// ✅ Lấy tất cả trạng thái
+//Lấy tất cả trạng thái
 router.get("/", getAllDeviceStates);
 
-// ✅ Lấy trạng thái của 1 device
+//Lấy trạng thái của 1 device
 router.get("/:deviceType", getDeviceState);
 
-// ✅ Cập nhật LED brightness
+//Cập nhật LED brightness
 router.put("/led/brightness", updateLedBrightness);
 
-// ✅ Cập nhật Buzzer config
+//Cập nhật Buzzer config
 router.put("/buzzer/config", updateBuzzerConfig);
 
-// ✅ Test buzzer
+//Test buzzer
 router.post("/buzzer/test", testBuzzer);
 
 module.exports = router;
