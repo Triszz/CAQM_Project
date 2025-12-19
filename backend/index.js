@@ -1,10 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-// THEM: Import và khởi tạo MQTT client
+
 const { initMqttClient } = require("./config/mqtt.client");
 
-// THEM: Khởi tạo MQTT client NGAY ĐẦU
 initMqttClient();
 
 const mongoose = require("mongoose");
@@ -12,7 +11,7 @@ const userRouter = require("./routes/user.route");
 const sensorRouter = require("./routes/sensor.route");
 const deviceStateRouter = require("./routes/deviceState.route");
 const airQualityRouter = require("./routes/airQuality.route");
-const emailRoutes = require("./routes/email.route");
+
 const chatbotRouter = require("./routes/chatbot.route");
 
 const app = express();
@@ -30,7 +29,7 @@ app.use("/api", userRouter);
 app.use("/api/sensor", sensorRouter);
 app.use("/api/device-state", deviceStateRouter);
 app.use("/api/air-quality", airQualityRouter);
-app.use("/api/email", emailRoutes);
+
 app.use("/api/chatbot", chatbotRouter);
 
 // connect

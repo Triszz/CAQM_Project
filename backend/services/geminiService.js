@@ -1,12 +1,10 @@
-// services/geminiService.js
-
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Sensor = require("../models/sensor.model");
-
+const sensorDataService = require("./sensorDataService");
 // Khởi tạo Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Định nghĩa tools (functions) cho Gemini
+// Định nghĩa tools cho Gemini
 const tools = [
   {
     functionDeclarations: [
@@ -65,20 +63,17 @@ CÁCH XÁC ĐỊNH THAM SỐ hours:
   },
 ];
 
-// Hàm thực thi tool (GIỐNG Y HỆT HÀM CONTROLLER)
+// Hàm thực thi tool
 async function executeTool(functionName, args) {
   console.log(`Executing tool: ${functionName}`);
   console.log(`Arguments:`, args);
 
   try {
-    // TOOL 1: Lấy data MỚI NHẤT
+    // TOOL 1: Lấy data mới nhất
     if (functionName === "getLatestSensorData") {
-      const latestData = await Sensor.findOne()
-        .sort({ timestamp: -1 }) // ← Sắp xếp theo thời gian giảm dần
-        .limit(1)
-        .lean();
+      const data = await sensorDataService.getLatestData();
 
-      if (!latestData) {
+      if (!data) {
         return {
           success: false,
           message: "No sensor data found",
@@ -86,94 +81,31 @@ async function executeTool(functionName, args) {
         };
       }
 
-      const formattedData = {
-        temperature: parseFloat(latestData.temperature?.toFixed(2) || 0),
-        humidity: parseFloat(latestData.humidity?.toFixed(2) || 0),
-        co2: Math.round(latestData.co2 || 0),
-        co: parseFloat(latestData.co?.toFixed(2) || 0),
-        pm25: parseFloat(latestData.pm25?.toFixed(2) || 0),
-        timestamp: latestData.timestamp,
-      };
-
-      console.log("Latest sensor data:", formattedData);
-
       return {
         success: true,
         message: "Latest sensor data retrieved",
-        data: formattedData,
+        data: data,
       };
     }
 
-    // TOOL 2: Tính TRUNG BÌNH (code cũ)
+    // TOOL 2: Tính trung bình
     if (functionName === "getSensorAverages") {
       const hours = args.hours || null;
+      const data = await sensorDataService.calculateAverages(hours);
 
-      const pipeline = [];
-
-      if (hours) {
-        const timeLimit = new Date(Date.now() - hours * 60 * 60 * 1000);
-        pipeline.push({
-          $match: {
-            timestamp: { $gte: timeLimit },
-          },
-        });
-        console.log(`Filtering data from last ${hours} hours`);
-      }
-
-      pipeline.push({
-        $group: {
-          _id: null,
-          avgTemperature: { $avg: "$temperature" },
-          avgHumidity: { $avg: "$humidity" },
-          avgCO2: { $avg: "$co2" },
-          avgCO: { $avg: "$co" },
-          avgPM25: { $avg: "$pm25" },
-          totalRecords: { $sum: 1 },
-          oldestRecord: { $min: "$timestamp" },
-          newestRecord: { $max: "$timestamp" },
-        },
-      });
-
-      const averages = await Sensor.aggregate(pipeline);
-
-      if (!averages || averages.length === 0) {
+      if (!data) {
         return {
           success: false,
           message: "No sensor data found",
-          data: {
-            temperature: 0,
-            humidity: 0,
-            co2: 0,
-            co: 0,
-            pm25: 0,
-            totalRecords: 0,
-          },
         };
       }
-
-      const result = averages[0];
-
-      const formattedResult = {
-        temperature: parseFloat(result.avgTemperature?.toFixed(2) || 0),
-        humidity: parseFloat(result.avgHumidity?.toFixed(2) || 0),
-        co2: Math.round(result.avgCO2 || 0),
-        co: parseFloat(result.avgCO?.toFixed(2) || 0),
-        pm25: parseFloat(result.avgPM25?.toFixed(2) || 0),
-        totalRecords: result.totalRecords || 0,
-        timeRange: {
-          from: result.oldestRecord || null,
-          to: result.newestRecord || null,
-        },
-      };
-
-      console.log("Sensor averages:", formattedResult);
 
       return {
         success: true,
         message: hours
           ? `Sensor averages for last ${hours} hours`
           : "Sensor averages for all data",
-        data: formattedResult,
+        data: data,
       };
     }
 
@@ -196,7 +128,6 @@ async function chat(userMessage, conversationHistory = []) {
     console.log("\n========== GEMINI CHAT ==========");
     console.log("👤 User:", userMessage);
 
-    // Dùng gemini-2.5-flash (mới nhất, hỗ trợ function calling)
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
       tools: tools,

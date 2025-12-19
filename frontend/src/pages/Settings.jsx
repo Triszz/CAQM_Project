@@ -15,7 +15,7 @@ function Settings({ chatMessages, setChatMessages }) {
     ledSave: false,
   });
 
-  // ✅ Load config từ DB khi component mount
+  // Load config từ DB khi component mount
   useEffect(() => {
     const loadDeviceStates = async () => {
       if (!user?.token) return;
@@ -33,20 +33,19 @@ function Settings({ chatMessages, setChatMessages }) {
           setBrightness(ledResponse.data.data.ledState.brightness);
         }
 
-        console.log("✅ Device states loaded");
+        console.log("Device states loaded");
       } catch (error) {
-        console.error("❌ Failed to load device states:", error);
+        console.error("Failed to load device states:", error);
       }
     };
 
     loadDeviceStates();
   }, [user?.token]);
 
-  // ✅ Test buzzer với số lần beep từ input
+  // Test buzzer
   const handleTestBuzzer = async (e) => {
     e.preventDefault();
 
-    // Validate
     if (beep < 1 || beep > 10) {
       alert("Số lần beep phải từ 1 đến 10!");
       return;
@@ -55,24 +54,23 @@ function Settings({ chatMessages, setChatMessages }) {
     setLoading({ ...loading, buzzerTest: true });
 
     try {
-      // ✅ Gửi beepCount từ state (input của user)
       const response = await DeviceStateAPI.testBuzzer({
         beepCount: parseInt(beep),
-        beepDuration: 200, // Mặc định
-        interval: 100, // Mặc định
+        beepDuration: 200,
+        interval: 100,
       });
 
-      console.log("✅ Buzzer test sent:", response.data);
+      console.log("Buzzer test sent:", response.data);
       alert(`Đã gửi lệnh test: ${beep} lần beep!`);
     } catch (error) {
-      console.error("❌ Failed to test buzzer:", error);
+      console.error("Failed to test buzzer:", error);
       alert("Không thể test buzzer. Vui lòng thử lại!");
     } finally {
       setLoading({ ...loading, buzzerTest: false });
     }
   };
 
-  // ✅ Lưu config buzzer
+  // Lưu config buzzer
   const handleSaveBuzzer = async (e) => {
     e.preventDefault();
 
@@ -86,20 +84,20 @@ function Settings({ chatMessages, setChatMessages }) {
     try {
       const response = await DeviceStateAPI.updateBuzzerConfig({
         beepCount: parseInt(beep),
-        beepDuration: 200, // Mặc định
-        interval: 100, // Mặc định
+        beepDuration: 200,
+        interval: 100,
       });
-      console.log("✅ Buzzer config saved:", response.data);
+      console.log("Buzzer config saved:", response.data);
       alert("Đã lưu cài đặt buzzer thành công!");
     } catch (error) {
-      console.error("❌ Failed to save buzzer config:", error);
+      console.error("Failed to save buzzer config:", error);
       alert("Không thể lưu cài đặt. Vui lòng thử lại!");
     } finally {
       setLoading({ ...loading, buzzerSave: false });
     }
   };
 
-  // ✅ Lưu brightness LED
+  // Lưu brightness LED
   const handleSaveLED = async (e) => {
     e.preventDefault();
     setLoading({ ...loading, ledSave: true });
@@ -108,10 +106,10 @@ function Settings({ chatMessages, setChatMessages }) {
       const response = await DeviceStateAPI.updateLedBrightness({
         brightness: parseInt(brightness),
       });
-      console.log("✅ LED brightness saved:", response.data);
+      console.log("LED brightness saved:", response.data);
       alert(`Đã lưu độ sáng LED: ${brightness}%`);
     } catch (error) {
-      console.error("❌ Failed to save LED brightness:", error);
+      console.error("Failed to save LED brightness:", error);
       alert("Không thể lưu độ sáng. Vui lòng thử lại!");
     } finally {
       setLoading({ ...loading, ledSave: false });
@@ -129,7 +127,7 @@ function Settings({ chatMessages, setChatMessages }) {
         </Link>
       </div>
 
-      {/* ✅ Buzzer Settings */}
+      {/* Buzzer Settings */}
       <div className="buzzer-setting-container">
         <div className="buzzer-setting-title">
           <h2>Cài đặt Buzzer</h2>
@@ -167,7 +165,7 @@ function Settings({ chatMessages, setChatMessages }) {
         </form>
       </div>
 
-      {/* ✅ LED Settings */}
+      {/* LED Settings */}
       <div className="led-setting-container">
         <div className="led-setting-title">
           <h2>Cài đặt Độ sáng</h2>

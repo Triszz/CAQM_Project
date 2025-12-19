@@ -100,14 +100,14 @@ function Home({ chatMessages, setChatMessages }) {
         const response = await SensorAPI.getLatestSensorReading();
         const data = response.data.data;
 
-        // ✅ 1. Update gauges
+        // 1. Update gauges
         setTemperature(data.temperature);
         setHumidity(data.humidity);
         setCo2(data.co2);
         setCo(data.co);
         setPm25(data.pm25);
 
-        // ✅ 2. Update chart
+        // 2. Update chart
         const newPoint = {
           time: new Date().toLocaleTimeString("vi-VN", {
             hour: "2-digit",
@@ -130,16 +130,16 @@ function Home({ chatMessages, setChatMessages }) {
           return updated;
         });
 
-        console.log(`🔄 [${new Date().toLocaleTimeString()}] Gauges & Chart updated`);
+        console.log(
+          `[${new Date().toLocaleTimeString()}] Gauges & Chart updated`
+        );
       } catch (error) {
         console.error("❌ Failed to update sensor data:", error);
       }
     };
 
-    // ✅ Chạy ngay lần đầu (sau khi load initial data)
     updateSensorData();
 
-    // ✅ Interval 3 giây
     const sensorInterval = setInterval(updateSensorData, 3000);
 
     return () => clearInterval(sensorInterval);
@@ -182,7 +182,15 @@ function Home({ chatMessages, setChatMessages }) {
           unit="ppm"
           customThresholds={[800, 1000]}
         />
-        <Gauge id="co-gauge" title="CO" value={co} minValue={0} maxValue={50} unit="ppm" customThresholds={[5, 9]} />
+        <Gauge
+          id="co-gauge"
+          title="CO"
+          value={co}
+          minValue={0}
+          maxValue={50}
+          unit="ppm"
+          customThresholds={[5, 9]}
+        />
         <Gauge
           id="temp-gauge"
           title="Nhiệt độ"
@@ -216,12 +224,20 @@ function Home({ chatMessages, setChatMessages }) {
       </div>
 
       {!showChatbot && (
-        <button className="chatbot-toggle-button" onClick={() => setShowChatbot(true)} title="Mở AI Assistant">
+        <button
+          className="chatbot-toggle-button"
+          onClick={() => setShowChatbot(true)}
+          title="Mở AI Assistant"
+        >
           💬
         </button>
       )}
       {showChatbot && (
-        <ChatBot onClose={() => setShowChatbot(false)} messages={chatMessages} setMessages={setChatMessages} />
+        <ChatBot
+          onClose={() => setShowChatbot(false)}
+          messages={chatMessages}
+          setMessages={setChatMessages}
+        />
       )}
     </div>
   );

@@ -1,5 +1,3 @@
-// components/ChatBot.jsx
-
 import { useState, useRef, useEffect } from "react";
 import { ChatbotAPI } from "../services/api";
 import { useAuthContext } from "../hooks/useAuthContext";
@@ -37,16 +35,11 @@ function ChatBot({ onClose, messages, setMessages }) {
     setIsLoading(true);
 
     try {
-      // ✅ Gọi API chatbot với Axios
-      const response = await ChatbotAPI.sendMessage(
-        currentInput,
-        user._id // userId
-      );
+      const response = await ChatbotAPI.sendMessage(currentInput, user._id);
 
-      // ✅ Axios tự động parse JSON, lấy data từ response.data
       const botMessage = {
         id: messages.length + 2,
-        text: response.data.message, // ✅ response.data.message (không phải response.message)
+        text: response.data.message,
         sender: "bot",
         timestamp: new Date().toLocaleTimeString("vi-VN", {
           hour: "2-digit",
@@ -63,7 +56,6 @@ function ChatBot({ onClose, messages, setMessages }) {
         "Xin lỗi, tôi gặp lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.";
 
       if (error.response?.data?.message) {
-        // Backend trả về error message
         errorText = error.response.data.message;
       } else if (error.message) {
         errorText = `Lỗi: ${error.message}`;

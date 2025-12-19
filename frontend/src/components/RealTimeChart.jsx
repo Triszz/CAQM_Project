@@ -1,5 +1,14 @@
 import React, { useState } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 function RealTimeChart({ data }) {
   const [selectedSensor, setSelectedSensor] = useState("co2");
@@ -47,7 +56,6 @@ function RealTimeChart({ data }) {
   return (
     <div className="realtime-chart-container">
       <div className="realtime-header">
-        {/*Thay đổi title */}
         <h3>Dữ liệu cảm biến trong 1 giờ gần nhất</h3>
 
         <div className="sensor-selector">
@@ -69,13 +77,16 @@ function RealTimeChart({ data }) {
 
       {data.length > 0 ? (
         <ResponsiveContainer width="100%" height={350}>
-          <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <LineChart
+            data={data}
+            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
             <XAxis
               dataKey="time"
-              tick={{ fontSize: 10 }} //Giảm font size vì nhiều điểm hơn
+              tick={{ fontSize: 10 }}
               interval="preserveStartEnd"
-              minTickGap={80} //Tăng khoảng cách giữa labels
+              minTickGap={80}
             />
             <YAxis
               domain={currentSensor.yAxisDomain}
@@ -94,7 +105,10 @@ function RealTimeChart({ data }) {
                 borderRadius: "8px",
                 padding: "10px",
               }}
-              formatter={(value) => [`${value} ${currentSensor.unit}`, currentSensor.name]}
+              formatter={(value) => [
+                `${value} ${currentSensor.unit}`,
+                currentSensor.name,
+              ]}
             />
             <Legend iconType="line" />
             <Line
@@ -103,7 +117,6 @@ function RealTimeChart({ data }) {
               stroke={currentSensor.color}
               strokeWidth={2}
               name={`${currentSensor.name} (${currentSensor.unit})`}
-              // dot={{ r: 2, fill: currentSensor.color }}
               dot={false}
               activeDot={{ r: 4 }}
               isAnimationActive={false}
@@ -119,8 +132,8 @@ function RealTimeChart({ data }) {
       {data.length > 0 && (
         <div className="realtime-info">
           <p>
-            {/*Cập nhật text hiển thị */}
-            Cập nhật mỗi 3 giây • Hiển thị {data.length} điểm dữ liệu ({Math.floor((data.length * 3) / 60)} phút)
+            Cập nhật mỗi 3 giây • Hiển thị {data.length} điểm dữ liệu (
+            {Math.floor((data.length * 3) / 60)} phút)
           </p>
         </div>
       )}

@@ -36,13 +36,16 @@ DHT dht(DHT_PIN, DHT_TYPE);
 #define MQ135_PIN 34
 #define MQ7_PIN 35
 
-#define PMS_RX 16
-#define PMS_TX 17
-HardwareSerial pmsSerial(2);
+#define GP2Y10_LED_PIN 26   // Chân điều khiển LED (Digital)
+#define GP2Y10_VOUT_PIN 36  // Chân đọc Analog
+// Các hằng số thời gian lấy mẫu cho GP2Y10
+const int SAMPLING_TIME = 280;
+const int DELTA_TIME = 40;
+const int SLEEP_TIME = 9680;
 
 // ======================== GLOBAL VARIABLES ========================
 unsigned long lastPublish = 0;
-const unsigned long PUBLISH_INTERVAL = 3000; // ✅ SỬA: 3 giây (giảm tải)
+const unsigned long PUBLISH_INTERVAL = 3000; // 3 giây (giảm tải)
 
 float temperature = 0;
 float humidity = 0;
@@ -67,19 +70,19 @@ void setLED(String color, int brightness) {
   int pwmValue = brightnessToPWM(brightness);
 
   if (color == "green") {
-    ledcWrite(GREEN_LED_PIN, pwmValue);  
-    ledcWrite(YELLOW_LED_PIN, 0);          
-    ledcWrite(RED_LED_PIN, 0);          
+    analogWrite(GREEN_LED_PIN, pwmValue);
+    analogWrite(YELLOW_LED_PIN, 0);
+    analogWrite(RED_LED_PIN, 0);         
   }
-  else if (color == "yellow") {
-    ledcWrite(GREEN_LED_PIN, 0);          
-    ledcWrite(YELLOW_LED_PIN, pwmValue);   
-    ledcWrite(RED_LED_PIN, 0);          
+  else if (color == "yellow") { 
+    analogWrite(GREEN_LED_PIN, 0);
+    analogWrite(YELLOW_LED_PIN, pwmValue);
+    analogWrite(RED_LED_PIN, 0);         
   }
   else if (color == "red") {
-    ledcWrite(GREEN_LED_PIN, 0);          
-    ledcWrite(YELLOW_LED_PIN, 0);          
-    ledcWrite(RED_LED_PIN, pwmValue);   
+    analogWrite(GREEN_LED_PIN, 0);
+    analogWrite(YELLOW_LED_PIN, 0);
+    analogWrite(RED_LED_PIN, pwmValue);   
   }
 
   currentBrightness = brightness;
@@ -154,10 +157,9 @@ void setup() {
   lcd.setCursor(0, 0); lcd.print("System Starting");
   lcd.setCursor(0, 1); lcd.print("Please wait...");
 
-  // ✅ ESP32 Core 3.x: ledcAttach(pin, freq, res)
-  ledcAttach(GREEN_LED_PIN, 5000, 8);
-  ledcAttach(YELLOW_LED_PIN, 5000, 8);
-  ledcAttach(RED_LED_PIN, 5000, 8);
+  pinMode(GREEN_LED_PIN, OUTPUT);
+  pinMode(YELLOW_LED_PIN, OUTPUT);
+  pinMode(RED_LED_PIN, OUTPUT);
 
   setLED("green", 75);
 
@@ -165,13 +167,16 @@ void setup() {
   digitalWrite(BUZZER_PIN, LOW);
 
   dht.begin();
-  pmsSerial.begin(9600, SERIAL_8N1, PMS_RX, PMS_TX);
 
-  // ✅ WiFiManager Setup
+  pinMode(GP2Y10_LED_PIN, OUTPUT);
+  digitalWrite(GP2Y10_LED_PIN, HIGH); // Mặc định tắt LED
+  analogReadResolution(12); // Đảm bảo độ phân giải 12-bit (0-4095)
+
+  // WiFiManager Setup
   WiFiManager wm;
   wm.setAPCallback(configModeCallback);
   
-  // wm.resetSettings(); // Uncomment để xóa WiFi đã lưu
+  //wm.resetSettings(); // Uncomment để xóa WiFi đã lưu
 
   String apName = "ESP32_Config_" + String(STUDENT_ID);
   Serial.println(" Connecting to WiFi via WiFiManager...");
@@ -191,7 +196,7 @@ void setup() {
   delay(500); 
   digitalWrite(BUZZER_PIN, LOW);
 
-  // ✅ MQTT Setup
+  // MQTT Setup
   client.setServer(mqtt_server, mqtt_port);
   client.setBufferSize(1024);
   client.setCallback(mqttCallback);
@@ -223,7 +228,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial.printf("\n========================================\n");
   Serial.printf(" Topic: %s\n", topic);
   
-  // ✅ THÊM: In ra payload để debug
+  // In ra payload để debug
   Serial.print(" Payload: ");
   for (unsigned int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
@@ -243,11 +248,11 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   const char* device = doc["device"];
   const char* action = doc["action"];
   
-  // ✅ THÊM: In ra device và action
+  // THÊM: In ra device và action
   Serial.printf(" Device: %s\n", device ? device : "NULL");
   Serial.printf(" Action: %s\n", action ? action : "NULL");
 
-  // ✅ LED: Set color (từ AI)
+  // LED: Set color
   if (strcmp(device, "led") == 0 && strcmp(action, "set_color") == 0) {
     const char* color = doc["color"];
     int brightness = doc.containsKey("brightness") ? doc["brightness"].as<int>() : currentBrightness;
@@ -257,7 +262,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.printf(" AI: LED %s (Quality: %s)\n", color, quality ? quality : "N/A");
   }
   
-  // ✅ LED: Set brightness (từ Settings)
+  // LED: Set brightness (từ Settings)
   else if (strcmp(device, "led") == 0 && strcmp(action, "set_brightness") == 0) {
     int brightness = doc["brightness"];
     String color = doc.containsKey("color") ? String((const char*)doc["color"]) : currentColor;
@@ -266,7 +271,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.printf(" User: Brightness %d%%\n", brightness);
   }
   
-  // ✅ SỬA: Buzzer ALERT (AI tự động khi air quality kém)
+  // Buzzer ALERT (AI tự động khi air quality kém)
   else if (strcmp(device, "buzzer") == 0 && strcmp(action, "alert") == 0) {
     int beepCount = doc["config"]["beepCount"];
     int beepDuration = doc["config"]["beepDuration"];
@@ -276,7 +281,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     beepPattern(beepCount, beepDuration, interval);
   }
   
-  // ✅ SỬA: Buzzer TEST (User click Test trong Settings)
+  // Buzzer TEST (User click Test trong Settings)
   else if (strcmp(device, "buzzer") == 0 && strcmp(action, "test") == 0) {
     int beepCount = doc["config"]["beepCount"];
     int beepDuration = doc["config"]["beepDuration"];
@@ -286,7 +291,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     beepPattern(beepCount, beepDuration, interval);
   }
   
-  // ⚠️ Unknown device/action
+  // Unknown device/action
   else {
     Serial.println(" Unknown device or action!");
   }
@@ -331,16 +336,32 @@ void readSensors() {
 
 // ======================== READ PM2.5 FROM PMS5003 ========================
 float readPM25() {
-  if (pmsSerial.available() >= 32) {
-    byte buffer[32];
-    pmsSerial.readBytes(buffer, 32);
-    
-    if (buffer[0] == 0x42 && buffer[1] == 0x4d) {
-      int pm25_raw = (buffer[12] << 8) | buffer[13]; // ✅ SỬA: Thêm 8
-      return pm25_raw;
-    }
+  // 1. Bật LED IR
+  digitalWrite(GP2Y10_LED_PIN, LOW);
+  delayMicroseconds(SAMPLING_TIME);
+
+  // 2. Đọc giá trị Analog
+  int rawValue = analogRead(GP2Y10_VOUT_PIN);
+
+  // 3. Tắt LED IR
+  delayMicroseconds(DELTA_TIME);
+  digitalWrite(GP2Y10_LED_PIN, HIGH);
+  delayMicroseconds(SLEEP_TIME);
+
+  // 4. Tính toán điện áp (ESP32: 3.3V, 12-bit ADC)
+  float voltage = rawValue * (3.3 / 4095.0);
+
+  // 5. Tính nồng độ bụi (Công thức Linear cơ bản cho Sharp)
+  // Ngưỡng voltage khi không có bụi thường khoảng 0.5V - 0.6V
+  float dust = 0;
+  if (voltage > 0.6) {
+    dust = (voltage - 0.6) / 0.5 * 100.0;
   }
-  return 0;
+  
+  // Debug
+  // Serial.printf("GP2Y10 Raw: %d | Volt: %.2f | Dust: %.2f\n", rawValue, voltage, dust);
+  
+  return dust;
 }
 
 // ======================== PUBLISH SENSOR DATA ========================

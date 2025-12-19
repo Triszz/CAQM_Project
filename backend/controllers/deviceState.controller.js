@@ -3,7 +3,7 @@ const mqtt = require("mqtt");
 const MQTT_TOPICS = require("../config/mqtt.config");
 const { getMqttClient } = require("../config/mqtt.client");
 
-// Cập nhật độ sáng LED (GIỮ MÀU HIỆN TẠI)
+// Cập nhật độ sáng LED
 const updateLedBrightness = async (req, res) => {
   try {
     const { brightness } = req.body;
@@ -33,18 +33,24 @@ const updateLedBrightness = async (req, res) => {
       { new: true, upsert: true }
     );
 
-    // Gửi lệnh qua MQTT (bao gồm CẢ brightness VÀ color)
+    // Gửi lệnh qua MQTT
     const mqttPayload = {
       device: "led",
       action: "set_brightness",
       brightness: brightness,
-      color: currentColor, // Giữ nguyên màu hiện tại
+      color: currentColor,
       timestamp: new Date().toISOString(),
     };
     const mqttClient = getMqttClient();
-    mqttClient.publish(MQTT_TOPICS.DEVICE_CONTROL, JSON.stringify(mqttPayload), { qos: 1 });
+    mqttClient.publish(
+      MQTT_TOPICS.DEVICE_CONTROL,
+      JSON.stringify(mqttPayload),
+      { qos: 1 }
+    );
 
-    console.log(`LED brightness updated: ${brightness}% (color: ${currentColor})`);
+    console.log(
+      `LED brightness updated: ${brightness}% (color: ${currentColor})`
+    );
 
     res.status(200).json({
       success: true,
@@ -103,13 +109,12 @@ const updateBuzzerConfig = async (req, res) => {
   }
 };
 
-// Test buzzer với config từ frontend (không lưu vào DB)
+// Test buzzer với config từ frontend
 const testBuzzer = async (req, res) => {
   try {
-    // Lấy config từ request body (từ frontend)
     const { beepCount, beepDuration, interval } = req.body;
     console.log("Request body:", req.body);
-    // Validate beepCount
+
     if (!beepCount || beepCount < 1 || beepCount > 10) {
       return res.status(400).json({
         success: false,
@@ -117,14 +122,13 @@ const testBuzzer = async (req, res) => {
       });
     }
 
-    // Gửi lệnh test qua MQTT với config từ user
     const mqttPayload = {
       device: "buzzer",
       action: "test",
       config: {
         beepCount: parseInt(beepCount),
-        beepDuration: parseInt(beepDuration) || 200, // Default 200ms
-        interval: parseInt(interval) || 100, // Default 100ms
+        beepDuration: parseInt(beepDuration) || 200,
+        interval: parseInt(interval) || 100,
       },
       timestamp: new Date().toISOString(),
     };
@@ -132,9 +136,13 @@ const testBuzzer = async (req, res) => {
     console.log("MQTT Payload (Test Buzzer):");
     console.log(JSON.stringify(mqttPayload, null, 2));
     const mqttClient = getMqttClient();
-    mqttClient.publish(MQTT_TOPICS.DEVICE_CONTROL, JSON.stringify(mqttPayload), {
-      qos: 1,
-    });
+    mqttClient.publish(
+      MQTT_TOPICS.DEVICE_CONTROL,
+      JSON.stringify(mqttPayload),
+      {
+        qos: 1,
+      }
+    );
 
     console.log(`Buzzer test triggered: ${beepCount} beeps (not saved to DB)`);
 

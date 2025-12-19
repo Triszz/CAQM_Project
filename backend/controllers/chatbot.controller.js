@@ -1,8 +1,5 @@
-// controllers/chatbot.controller.js
-
 const { chat } = require("../services/geminiService");
 
-// Lưu conversation history trong memory (production nên dùng Redis/Database)
 const conversations = new Map();
 
 const sendMessage = async (req, res) => {
@@ -26,7 +23,6 @@ const sendMessage = async (req, res) => {
       });
     }
 
-    // Lấy conversation history
     let conversationHistory = conversations.get(userId) || [];
 
     // Gọi Gemini
@@ -57,7 +53,8 @@ const sendMessage = async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
-      message: "Xin lỗi, tôi gặp lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.",
+      message:
+        "Xin lỗi, tôi gặp lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.",
     });
   }
 };

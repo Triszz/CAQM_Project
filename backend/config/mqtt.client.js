@@ -1,5 +1,3 @@
-// config/mqtt.client.js
-
 const mqtt = require("mqtt");
 const MQTT_TOPICS = require("./mqtt.config");
 
@@ -13,7 +11,7 @@ function initMqttClient() {
 
   console.log("Initializing shared MQTT client...");
 
-  mqttClient = mqtt.connect(process.env.MQTT_BROKER_URL || "mqtt://broker.hivemq.com", {
+  mqttClient = mqtt.connect("mqtt://broker.hivemq.com", {
     clientId: `backend_${Math.random().toString(16).slice(2, 10)}`,
     clean: true,
     reconnectPeriod: 1000,
@@ -22,9 +20,9 @@ function initMqttClient() {
   mqttClient.on("connect", () => {
     isConnected = true;
     console.log("Shared MQTT client connected");
-    console.log("   Broker:", process.env.MQTT_BROKER_URL || "mqtt://broker.hivemq.com");
+    console.log("   Broker:", "mqtt://broker.hivemq.com");
 
-    // THEM: Auto-subscribe sensor data khi connect
+    // Subcribe to topics
     mqttClient.subscribe(MQTT_TOPICS.SENSOR_DATA, { qos: 1 }, (err) => {
       if (err) {
         console.error("Subscribe error:", err);
@@ -58,7 +56,9 @@ function initMqttClient() {
 
 function getMqttClient() {
   if (!mqttClient) {
-    throw new Error("MQTT client not initialized! Call initMqttClient() in index.js first.");
+    throw new Error(
+      "MQTT client not initialized! Call initMqttClient() in index.js first."
+    );
   }
   return mqttClient;
 }

@@ -209,7 +209,7 @@ def generate_training_data():
         co = np.random.uniform(0, 5)
         pm25 = np.random.randint(0, 25)
         temp = np.random.uniform(25, 30)
-        hum = np.random.uniform(70, 85)
+        hum = np.random.uniform(50, 70)
         data.append([co2, co, pm25, temp, hum])
         labels_quality.append("Tốt")
         labels_problems.append([0, 0, 0, 0, 0])
@@ -401,7 +401,7 @@ def generate_training_data():
         co = np.random.uniform(0, 5)
         pm25 = np.random.randint(0, 30)
         temp = np.random.uniform(25, 30)
-        hum = np.random.choice([np.random.uniform(40, 65), np.random.uniform(92, 100)])  # ✅ <65 hoặc >92 = Poor
+        hum = np.random.choice([np.random.uniform(10, 40), np.random.uniform(80, 100)])  # ✅ <65 hoặc >92 = Poor
         data.append([co2, co, pm25, temp, hum])
         labels_quality.append("Kém")
         labels_problems.append([0, 0, 0, 0, 1])
@@ -501,7 +501,7 @@ def generate_training_data():
         co = np.random.uniform(15, 50)
         pm25 = np.random.randint(75, 200)
         temp = np.random.uniform(36, 40)
-        hum = np.random.uniform(40, 65)
+        hum = np.random.choice([np.random.uniform(10, 40), np.random.uniform(80, 100)])
         data.append([co2, co, pm25, temp, hum])
         labels_quality.append("Kém")
         labels_problems.append([1, 1, 1, 1, 0])
