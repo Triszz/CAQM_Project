@@ -248,7 +248,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   const char* device = doc["device"];
   const char* action = doc["action"];
   
-  // THÊM: In ra device và action
+  // In ra device và action
   Serial.printf(" Device: %s\n", device ? device : "NULL");
   Serial.printf(" Action: %s\n", action ? action : "NULL");
 
@@ -262,7 +262,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.printf(" AI: LED %s (Quality: %s)\n", color, quality ? quality : "N/A");
   }
   
-  // LED: Set brightness (từ Settings)
+  // LED: Set brightness 
   else if (strcmp(device, "led") == 0 && strcmp(action, "set_brightness") == 0) {
     int brightness = doc["brightness"];
     String color = doc.containsKey("color") ? String((const char*)doc["color"]) : currentColor;
@@ -271,7 +271,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.printf(" User: Brightness %d%%\n", brightness);
   }
   
-  // Buzzer ALERT (AI tự động khi air quality kém)
+  // Buzzer ALERT
   else if (strcmp(device, "buzzer") == 0 && strcmp(action, "alert") == 0) {
     int beepCount = doc["config"]["beepCount"];
     int beepDuration = doc["config"]["beepDuration"];
@@ -281,7 +281,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     beepPattern(beepCount, beepDuration, interval);
   }
   
-  // Buzzer TEST (User click Test trong Settings)
+  // Buzzer TEST
   else if (strcmp(device, "buzzer") == 0 && strcmp(action, "test") == 0) {
     int beepCount = doc["config"]["beepCount"];
     int beepDuration = doc["config"]["beepDuration"];

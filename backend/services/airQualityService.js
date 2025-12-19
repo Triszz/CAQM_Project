@@ -77,7 +77,7 @@ async function predictAirQuality(sensorData) {
           co,
           pm25,
           temperature,
-          humidity: 55,
+          humidity,
         }),
       }
     );
@@ -325,22 +325,22 @@ async function processSensorData(sensorData) {
           console.log("\n--- 4.2 PUSHSAFER ATTEMPT ---");
 
           // Gửi Pushsafer
-          // const pushsaferResult = await sendPushsaferAlert(
-          //   {
-          //     ...sensorData,
-          //     problematicSensors: problematicSensors,
-          //   },
-          //   quality
-          // );
+          const pushsaferResult = await sendPushsaferAlert(
+            {
+              ...sensorData,
+              problematicSensors: problematicSensors,
+            },
+            quality
+          );
 
-          // console.log("\n--- 4.2 PUSHSAFER RESULT ---");
-          // console.log("Success:", pushsaferResult.success);
-          // console.log("Sent:", pushsaferResult.sent);
-          // console.log("Message:", pushsaferResult.message);
+          console.log("\n--- 4.2 PUSHSAFER RESULT ---");
+          console.log("Success:", pushsaferResult.success);
+          console.log("Sent:", pushsaferResult.sent);
+          console.log("Message:", pushsaferResult.message);
 
-          // console.log(
-          //   "═══════════════════════════════════════════════════════\n"
-          // );
+          console.log(
+            "═══════════════════════════════════════════════════════\n"
+          );
         } catch (emailError) {
           console.error("\nEmail/Pushsafer block error:", emailError);
 

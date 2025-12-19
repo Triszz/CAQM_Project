@@ -20,7 +20,7 @@ function initMqttClient() {
   mqttClient.on("connect", () => {
     isConnected = true;
     console.log("Shared MQTT client connected");
-    console.log("   Broker:", "mqtt://broker.hivemq.com");
+    console.log("Broker:", "mqtt://broker.hivemq.com");
 
     // Subcribe to topics
     mqttClient.subscribe(MQTT_TOPICS.SENSOR_DATA, { qos: 1 }, (err) => {

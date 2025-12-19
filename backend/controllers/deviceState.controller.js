@@ -8,7 +8,6 @@ const updateLedBrightness = async (req, res) => {
   try {
     const { brightness } = req.body;
 
-    // Validate
     if (brightness === undefined || brightness < 0 || brightness > 100) {
       return res.status(400).json({
         success: false,
@@ -71,7 +70,6 @@ const updateBuzzerConfig = async (req, res) => {
   try {
     const { beepCount, beepDuration, interval } = req.body;
 
-    // Validate
     if (beepCount === undefined || beepCount < 1 || beepCount > 10) {
       return res.status(400).json({
         success: false,
