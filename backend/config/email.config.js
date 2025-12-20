@@ -4,14 +4,19 @@ const nodemailer = require("nodemailer");
 console.log("\n========== EMAIL CONFIG DEBUG ==========");
 console.log("EMAIL_USER:", process.env.EMAIL_USER);
 console.log("EMAIL_PASSWORD:", process.env.EMAIL_PASSWORD);
-console.log("EMAIL_PASSWORD length:", process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.length : 0);
-console.log("EMAIL_PASSWORD has spaces?", process.env.EMAIL_PASSWORD ? /\s/.test(process.env.EMAIL_PASSWORD) : "N/A");
+console.log(
+  "EMAIL_PASSWORD length:",
+  process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.length : 0
+);
+console.log(
+  "EMAIL_PASSWORD has spaces?",
+  process.env.EMAIL_PASSWORD ? /\s/.test(process.env.EMAIL_PASSWORD) : "N/A"
+);
 console.log("=========================================\n");
 
-// Kiểm tra nếu thiếu
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
   console.error("CRITICAL: EMAIL_USER or EMAIL_PASSWORD is undefined!");
-  console.error("  Check your .env file in backend/ directory");
+  console.error("Check your .env file in backend/ directory");
 
   // Tạm thời export một transporter giả để tránh crash
   module.exports = {
@@ -20,12 +25,12 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
   return;
 }
 
-// Cấu hình transporter (dùng Gmail)
+// Cấu hình transporter
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER, // Email của bạn
-    pass: process.env.EMAIL_PASSWORD, // App Password (KHÔNG phải mật khẩu Gmail)
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
   },
 });
 

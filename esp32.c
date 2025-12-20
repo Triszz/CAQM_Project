@@ -176,9 +176,9 @@ void setup() {
   WiFiManager wm;
   wm.setAPCallback(configModeCallback);
   
-  //wm.resetSettings(); // Uncomment để xóa WiFi đã lưu
+  //wm.resetSettings(); 
 
-  String apName = "ESP32_Config_" + String(STUDENT_ID);
+  String apName = "ESP32_Config_Group04";
   Serial.println(" Connecting to WiFi via WiFiManager...");
   
   if (!wm.autoConnect(apName.c_str())) {
@@ -271,7 +271,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.printf(" User: Brightness %d%%\n", brightness);
   }
   
-  // Buzzer ALERT
+  // Buzzer ALERT 
   else if (strcmp(device, "buzzer") == 0 && strcmp(action, "alert") == 0) {
     int beepCount = doc["config"]["beepCount"];
     int beepDuration = doc["config"]["beepDuration"];
@@ -281,7 +281,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     beepPattern(beepCount, beepDuration, interval);
   }
   
-  // Buzzer TEST
+  // Buzzer TEST (User click Test trong Settings)
   else if (strcmp(device, "buzzer") == 0 && strcmp(action, "test") == 0) {
     int beepCount = doc["config"]["beepCount"];
     int beepDuration = doc["config"]["beepDuration"];
@@ -317,7 +317,7 @@ void readSensors() {
   humidity = dht.readHumidity();
 
   if (isnan(temperature) || isnan(humidity)) { 
-    Serial.println(" DHT22 read error!");
+    Serial.println(" DHT11 read error!");
     temperature = 0.0; 
     humidity = 0.0; 
   }
@@ -334,7 +334,7 @@ void readSensors() {
                 temperature, humidity, co2, co, pm25);
 }
 
-// ======================== READ PM2.5 FROM PMS5003 ========================
+// ======================== READ PM2.5 FROM GP2Y10 ========================
 float readPM25() {
   // 1. Bật LED IR
   digitalWrite(GP2Y10_LED_PIN, LOW);

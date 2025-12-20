@@ -43,7 +43,7 @@ function Home({ chatMessages, setChatMessages }) {
     const airQualityInterval = setInterval(loadAirQuality, 3000);
 
     return () => clearInterval(airQualityInterval);
-  }, [user?.token]); // CHỈ phụ thuộc vào user.token
+  }, [user?.token]);
 
   // useEffect 2: Load dữ liệu 1 giờ ban đầu
   useEffect(() => {

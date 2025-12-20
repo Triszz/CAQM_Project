@@ -116,6 +116,7 @@ async function canSendEmailNow() {
     const cooldownTime = new Date(now.getTime() - EMAIL_COOLDOWN);
 
     const recentAlert = await AirQuality.findOne({
+      emailSent: true,
       timestamp: { $gte: cooldownTime },
     }).sort({ timestamp: -1 });
 
